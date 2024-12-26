@@ -330,7 +330,44 @@ class Render:
         self.backend = _backend
 
         return str(path)
+    def export_pointclouds(self, savepath, **kwargs):
+        """
+        Exports the scene to a .html
+        file for online renderings.
 
+        :param savepath: str, Path to a .html file to save the export
+        """
+        logger.debug(f"Exporting scene to {savepath}")
+        _backend = self.backend
+        _default_backend = vsettings.default_backend
+
+        if not self.is_rendered:
+            self.render(interactive=False, **kwargs)
+
+        path = Path(savepath)
+        if path.suffix != ".html":
+            raise ValueError("Savepath should point to a .html file")
+
+        # prepare settings
+        vsettings.default_backend = "k3d"
+
+        # Create new plotter and save to file
+        plt = Plotter()
+        plt.add(self.clean_renderables).render()
+        plt = plt.show(interactive=False)
+
+        with open(path, "w") as fp:
+            fp.write(plt.get_snapshot())
+
+        print(
+            f"The brainrender scene has been exported for web. The results are saved at {path}"
+        )
+
+        # Reset settings
+        vsettings.default_backend = _default_backend
+        self.backend = _backend
+
+        return str(path)
     def screenshot(self, name=None, scale=None, **kwargs):
         """
         Takes a screenshot of the current view
