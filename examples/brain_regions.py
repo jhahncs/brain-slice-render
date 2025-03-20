@@ -11,7 +11,7 @@ print(f"[{orange}]Running example: {Path(__file__).name}")
 scene = Scene(title="brain regions", atlas_name="allen_human_500um")
 
 # Add brain regions
-scene.add_brain_region("FGM")
+scene.add_brain_region("PL")
 
 # You can specify color, transparency...
 

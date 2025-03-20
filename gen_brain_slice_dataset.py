@@ -5,7 +5,7 @@ from vedo.colors import colors
 from operator import itemgetter
 import os
 from vtk.util import numpy_support
-
+import multiprocessing
 
 def _normalize(_vol):
     _data = _vol.dataset.GetPoints().GetData()
@@ -15,7 +15,87 @@ def _normalize(_vol):
     _vol.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
     #return _vol
 
+def process_task(_dir_surfix, num_of_slices, vol_index):
+    global _vol_norm
+    global DEBUG
+    _dir = f'{_dir_surfix}/fractured_{vol_index}'
+    
+    os.makedirs(_dir, exist_ok=True)
+    print(_dir)
+    v = vector(random.random(),random.random(), random.random())
+    p = vector(0, 0, 0)  # axis passes through this point
 
+
+    _vol_norm_rotated = _vol_norm.clone().rotate(random.randint(1,90), axis=v, point=p).color('blue5', 0.5)
+
+
+    if DEBUG:
+        mesh_obj_dict[vol_index] = {}
+        mesh_obj_dict[vol_index]['original'] = _vol_norm_rotated
+    #l = Line(-v+p, v+p).lw(3).c('red')
+
+    #_vol_norm_rotated.write(f'{_dir}/piece.obj')
+    #num_of_slices = random.randint(3,6)
+    #num_of_slices = 2
+    #num_of_slices = 5
+    
+    [xmin,xmax, ymin,ymax, zmin,zmax] = _vol_norm_rotated.bounds()
+    slice_tickness = (ymax-ymin)/num_of_slices
+    slice_size = (xmax-xmin, slice_tickness, zmax-zmin)
+    #
+    # 
+    # print(xmin,xmax, ymin,ymax, zmin,zmax)
+
+    #_cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds','YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu','GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+    slice_list = []
+    if DEBUG:
+        mesh_obj_dict[vol_index]['slice'] = []
+        mesh_obj_dict[vol_index]['cut_plane'] = []
+        mesh_obj_dict[vol_index]['box'] = []
+    slice_color_alpha = 0.8
+    for slice_index in range(num_of_slices):
+        
+        #slice_index = 3
+        _color = _cmaps[slice_index]
+        #_color = 'red5'
+        bottom_box = Box(pos=(xmin,ymin,zmin), size=((xmax-xmin)*2, (slice_index*slice_tickness)*2, (zmax-zmin)*2))
+        #bottom_box.color('green5', 0.5)
+        top_box = Box(pos=(xmin,ymax ,zmin), size=((xmax-xmin)*2, ( (num_of_slices-slice_index-1)*slice_tickness)*2, (zmax-zmin)*2))
+
+        top_box_bottom_plane = Plane(pos=[ (xmax - xmin)/2 + xmin, ymax-( (num_of_slices-slice_index-1)*slice_tickness)+0.001, (zmax - zmin)/2 + zmin], normal=[0,1.0,0],
+                                    s=[(xmax-xmin),(zmax-zmin)])
+        bottom_box_top_plane = Plane(pos=[(xmax - xmin)/2 + xmin, ymin+(slice_index*slice_tickness), (zmax - zmin)/2 + zmin], normal=[0,1.0,0],
+                                    s=[(xmax-xmin),(zmax-zmin)])
+        #top_box.color('red5', 0.5).
+
+        #top_box.project_on_plane('y')
+        if slice_index == 0:
+            _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).color(_color, slice_color_alpha)
+            if DEBUG:
+                mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
+                mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
+        elif  slice_index == num_of_slices - 1:
+            _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
+            if DEBUG:
+                mesh_obj_dict[vol_index]['cut_plane'].append(bottom_box_top_plane.alpha(0.4))
+                mesh_obj_dict[vol_index]['box'].append(bottom_box.color('g').alpha(0.4))
+
+        else:
+            _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
+            if DEBUG:
+                mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
+                mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
+
+        if DEBUG:
+            mesh_obj_dict[vol_index]['slice'].append(_vol_norm_rotated_slice.clone())
+
+        _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+
+        #print( np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
+        #slice_list.append(_vol_norm_rotated_slice)
+
+
+#    return result
     
 sorted_colors1 = sorted(colors.items(), key=itemgetter(1))
 _cmaps = []
@@ -32,9 +112,10 @@ settings.tiff_orientation_type = 4
 random.seed(42)
 random.shuffle(_cmaps)
 
-meshes = load_obj('output/meshes.obj')
+meshes = load_obj('resources/allen_mouse_100um.obj')
+print('obj loaded')
 _vol = meshes[0].normalize().binarize()
-
+print('converted into voxel')
 #_vol = Volume(dataurl + 'vase.vti')
 #_vol.dataset.GetPoints().SetData(_normalize(_vol.dataset.GetPoints().GetData()))
 
@@ -52,93 +133,37 @@ _vol_norm.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
 '''
 print( np.max(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().GetData()), axis=0) )
 
-
-num_of_slices = 3
-
-#for num_of_slices in range(6,15):
-for num_of_slices in [6]:
-        
+DEBUG = False
+if DEBUG:
     mesh_obj_dict = {}
+num_of_slices = 3
+num_of_slices_list = []
+vol_index_list = []
+dir_surfix_list = []
+#for num_of_slices in range(6,15):
 
-    #for vol_index in range(1000):    
-    for vol_index in [0]:
-        #_dir = f'temp/vase/1/fractured_{vol_index}'
-        _dir = f'output'
-        #_dir = f'/data/jhahn/data/shape_dataset/data/shape/vase/{num_of_slices}_parts/fractured_{vol_index}'
+for surfix in ['val']:
+    for num_of_slices in [10]:
+        _dir_surfix = f'/data/jhahn/data/shape_dataset/data/brain/{num_of_slices}_parts_{surfix}'
+        os.makedirs(_dir_surfix, exist_ok=True)
+        for vol_index in range(100):    
+        #for vol_index in [0]:
+            #_dir = f'temp/vase/1/fractured_{vol_index}'
+            dir_surfix_list.append(_dir_surfix)
+            num_of_slices_list.append(num_of_slices)
+            vol_index_list.append(vol_index)
+            #print(_dir)
+            #_dir = f'temp'
+       
 
-        print(_dir)
-        #_dir = f'temp'
-        os.makedirs(_dir, exist_ok=True)
+#def poolcontext(*args, **kwargs):
+##    pool = multiprocessing.Pool(*args, **kwargs)
+#   yield pool
+#    pool.terminate()        
 
-        v = vector(random.random(),random.random(), random.random())
-        p = vector(0, 0, 0)  # axis passes through this point
-
-
-        _vol_norm_rotated = _vol_norm.clone().rotate(random.randint(1,90), axis=v, point=p).color('blue5', 0.5)
-
-
-
-        mesh_obj_dict[vol_index] = {}
-        mesh_obj_dict[vol_index]['original'] = _vol_norm_rotated
-        #l = Line(-v+p, v+p).lw(3).c('red')
-
-        #_vol_norm_rotated.write(f'{_dir}/piece.obj')
-        #num_of_slices = random.randint(3,6)
-        #num_of_slices = 2
-        #num_of_slices = 5
-        
-        [xmin,xmax, ymin,ymax, zmin,zmax] = _vol_norm_rotated.bounds()
-        slice_tickness = (ymax-ymin)/num_of_slices
-        slice_size = (xmax-xmin, slice_tickness, zmax-zmin)
-        #
-        # 
-        # print(xmin,xmax, ymin,ymax, zmin,zmax)
-
-        #_cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds','YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu','GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
-        slice_list = []
-        mesh_obj_dict[vol_index]['slice'] = []
-        mesh_obj_dict[vol_index]['cut_plane'] = []
-        mesh_obj_dict[vol_index]['box'] = []
-        slice_color_alpha = 0.8
-        for slice_index in range(num_of_slices):
-            
-            #slice_index = 3
-            _color = _cmaps[slice_index]
-            #_color = 'red5'
-            bottom_box = Box(pos=(xmin,ymin,zmin), size=((xmax-xmin)*2, (slice_index*slice_tickness)*2, (zmax-zmin)*2))
-            #bottom_box.color('green5', 0.5)
-            top_box = Box(pos=(xmin,ymax ,zmin), size=((xmax-xmin)*2, ( (num_of_slices-slice_index-1)*slice_tickness)*2, (zmax-zmin)*2))
-
-            top_box_bottom_plane = Plane(pos=[ (xmax - xmin)/2 + xmin, ymax-( (num_of_slices-slice_index-1)*slice_tickness)+0.001, (zmax - zmin)/2 + zmin], normal=[0,1.0,0],
-                                        s=[(xmax-xmin),(zmax-zmin)])
-            bottom_box_top_plane = Plane(pos=[(xmax - xmin)/2 + xmin, ymin+(slice_index*slice_tickness), (zmax - zmin)/2 + zmin], normal=[0,1.0,0],
-                                        s=[(xmax-xmin),(zmax-zmin)])
-            #top_box.color('red5', 0.5).
-
-            #top_box.project_on_plane('y')
-            if slice_index == 0:
-                _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).color(_color, slice_color_alpha)
-                mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
-                mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
-            elif  slice_index == num_of_slices - 1:
-                _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
-                mesh_obj_dict[vol_index]['cut_plane'].append(bottom_box_top_plane.alpha(0.4))
-                mesh_obj_dict[vol_index]['box'].append(bottom_box.color('g').alpha(0.4))
-
-            else:
-                _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
-                mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
-                mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
-
-            mesh_obj_dict[vol_index]['slice'].append(_vol_norm_rotated_slice.clone())
-
-            _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
-
-            #print( np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
-            slice_list.append(_vol_norm_rotated_slice)
-
-
-
+print(f'the number of jobs:{len(dir_surfix_list)}')
+with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
+    results = pool.starmap(process_task, zip(dir_surfix_list,num_of_slices_list,vol_index_list))
             #if True:
             #    break
 
