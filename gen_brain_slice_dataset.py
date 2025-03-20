@@ -10,7 +10,8 @@ import multiprocessing
 def _normalize(_vol):
     _data = _vol.dataset.GetPoints().GetData()
     _data_np = numpy_support.vtk_to_numpy(_data)
-    _data_np = _data_np / np.max(_data_np, axis=0)
+    _data_np = _data_np - np.min(_data_np, axis=0)
+    _data_np = _data_np  / np.max(_data_np, axis=0)
     #return numpy_support.numpy_to_vtk(_data_np)
     _vol.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
     #return _vol
@@ -18,8 +19,9 @@ def _normalize(_vol):
 def process_task(_dir_surfix, num_of_slices, vol_index):
     global _vol_norm
     global DEBUG
-    _dir = f'{_dir_surfix}/fractured_{vol_index}'
-    
+
+
+    _dir = f'{_dir_surfix}/fractured_{vol_index}'    
     os.makedirs(_dir, exist_ok=True)
     print(_dir)
     v = vector(random.random(),random.random(), random.random())
@@ -27,31 +29,33 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
 
 
     _vol_norm_rotated = _vol_norm.clone().rotate(random.randint(1,90), axis=v, point=p).color('blue5', 0.5)
+    _normalize(_vol_norm_rotated)
 
 
-    if DEBUG:
-        mesh_obj_dict[vol_index] = {}
-        mesh_obj_dict[vol_index]['original'] = _vol_norm_rotated
-    #l = Line(-v+p, v+p).lw(3).c('red')
-
-    #_vol_norm_rotated.write(f'{_dir}/piece.obj')
-    #num_of_slices = random.randint(3,6)
-    #num_of_slices = 2
-    #num_of_slices = 5
-    
     [xmin,xmax, ymin,ymax, zmin,zmax] = _vol_norm_rotated.bounds()
     slice_tickness = (ymax-ymin)/num_of_slices
-    slice_size = (xmax-xmin, slice_tickness, zmax-zmin)
-    #
-    # 
-    # print(xmin,xmax, ymin,ymax, zmin,zmax)
 
-    #_cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds','YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu','GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
-    slice_list = []
+
     if DEBUG:
+
+        #plt = Plotter(size=(600,400), bg='GhostWhite')
+        #plt.show(_vol_norm_rotated, axes=1, title="matplotlib colors", interactive=False)
+        #plt.interactive()
+        #plt.close()
+        print('rotated')
+        print('max', np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated.dataset.GetPoints().GetData()), axis=0) )
+        print('min', np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated.dataset.GetPoints().GetData()), axis=0) )
+
+        mesh_obj_dict = {}
+        mesh_obj_dict[vol_index] = {}
+        mesh_obj_dict[vol_index]['original'] = _vol_norm_rotated
+        print('bounds',[xmin,xmax, ymin,ymax, zmin,zmax] )
+
         mesh_obj_dict[vol_index]['slice'] = []
         mesh_obj_dict[vol_index]['cut_plane'] = []
         mesh_obj_dict[vol_index]['box'] = []
+
+
     slice_color_alpha = 0.8
     for slice_index in range(num_of_slices):
         
@@ -73,12 +77,13 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
             _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).color(_color, slice_color_alpha)
             if DEBUG:
                 mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
-                mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
+                mesh_obj_dict[vol_index]['box'].append(top_box.color('r').alpha(0.4))
+                #print('top_box',top_box)
         elif  slice_index == num_of_slices - 1:
             _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
             if DEBUG:
                 mesh_obj_dict[vol_index]['cut_plane'].append(bottom_box_top_plane.alpha(0.4))
-                mesh_obj_dict[vol_index]['box'].append(bottom_box.color('g').alpha(0.4))
+                mesh_obj_dict[vol_index]['box'].append(bottom_box.color('b').alpha(0.4))
 
         else:
             _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
@@ -94,35 +99,49 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
         #print( np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
         #slice_list.append(_vol_norm_rotated_slice)
 
-
-#    return result
+    if DEBUG:
+        return mesh_obj_dict
     
 sorted_colors1 = sorted(colors.items(), key=itemgetter(1))
 _cmaps = []
 for sc in sorted_colors1:
-    # Get the color name
     cname = sc[0]
     # Skip the color if it doesn't end in a number
     if cname[-1] not in "123456789":
         continue
     _cmaps.append(cname)
-#_cmaps = list(colors.keys())
-#_cmaps = ['blue5']
+
 settings.tiff_orientation_type = 4 
 random.seed(42)
 random.shuffle(_cmaps)
 
-meshes = load_obj('resources/allen_mouse_100um.obj')
+meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
+#meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
+#meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
+print(meshes)
+
+
+
+
+meshes = meshes.tetralize().tomesh(fill=False)
+print(meshes)
+
+'''
+bb_ids = meshes.boundaries(non_manifold_edges=True, boundary_edges=True, return_cell_ids=True)
+print(bb_ids)
+meshes = meshes.delete_cells(bb_ids).clean()
+meshes = meshes.fill_holes(size=50)
+'''
+
 print('obj loaded')
-_vol = meshes[0].normalize().binarize()
+_vol = meshes.normalize().wireframe().binarize()
+
 print('converted into voxel')
+data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
 #_vol = Volume(dataurl + 'vase.vti')
 #_vol.dataset.GetPoints().SetData(_normalize(_vol.dataset.GetPoints().GetData()))
 
-
-
 _vol_norm = _vol.clone().isosurface(4, flying_edges=False).pos(0,0,0).color('yellow5', 0.5)
-
 _normalize(_vol_norm)
 '''
 _data = _vol_norm.dataset.GetPoints().GetData()
@@ -131,48 +150,44 @@ _data_np = _data_np / np.max(_data_np, axis=0)
 #print(np.max(_data_np, axis=0))
 _vol_norm.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
 '''
-print( np.max(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().GetData()), axis=0) )
+print('normalized')
+print('max', np.max(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().GetData()), axis=0) )
+print('min', np.min(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().GetData()), axis=0) )
 
-DEBUG = False
+
+
+DEBUG = True
+num_of_slices = 6
 if DEBUG:
-    mesh_obj_dict = {}
-num_of_slices = 3
-num_of_slices_list = []
-vol_index_list = []
-dir_surfix_list = []
-#for num_of_slices in range(6,15):
+    mesh_obj_dict = process_task("output",num_of_slices,0)
+else:
+    
+    num_of_slices_list = []
+    vol_index_list = []
+    dir_surfix_list = []
+    #for num_of_slices in range(6,15):
 
-for surfix in ['val']:
-    for num_of_slices in [10]:
-        _dir_surfix = f'/data/jhahn/data/shape_dataset/data/brain/{num_of_slices}_parts_{surfix}'
-        os.makedirs(_dir_surfix, exist_ok=True)
-        for vol_index in range(100):    
-        #for vol_index in [0]:
-            #_dir = f'temp/vase/1/fractured_{vol_index}'
-            dir_surfix_list.append(_dir_surfix)
-            num_of_slices_list.append(num_of_slices)
-            vol_index_list.append(vol_index)
-            #print(_dir)
-            #_dir = f'temp'
-       
 
-#def poolcontext(*args, **kwargs):
-##    pool = multiprocessing.Pool(*args, **kwargs)
-#   yield pool
-#    pool.terminate()        
+    for surfix in ['val']:
+        for num_of_slices in [10]:
+            _dir_surfix = f'{data_home_dir}/{num_of_slices}_parts_{surfix}'
+            os.makedirs(_dir_surfix, exist_ok=True)
+            for vol_index in range(100):    
+            #for vol_index in [0]:
+                dir_surfix_list.append(_dir_surfix)
+                num_of_slices_list.append(num_of_slices)
+                vol_index_list.append(vol_index)
 
-print(f'the number of jobs:{len(dir_surfix_list)}')
-with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
-    results = pool.starmap(process_task, zip(dir_surfix_list,num_of_slices_list,vol_index_list))
-            #if True:
-            #    break
+        
+        
+    print(f'the number of jobs:{len(dir_surfix_list)}')
+    with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
+        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list))
 
-exit()
-#show( mesh_obj_dict[0]['slice'], mesh_obj_dict[0]['cut_plane'], axes=1).close()
-#show( mesh_obj_dict[1]['slice'], mesh_obj_dict[1]['cut_plane'], axes=1).close()
-#show(slice_list, __doc__, axes=1)
+
+#exit()
+
 settings.immediate_rendering = False
-#_camera={'pos':(0.116346, 0.608809, 0.05899), 'viewup':(0,1,0),'distance ':3.26406 ,'focal_point ':(0.116346, 0.608809, 0.694924), 'thickness':2.33231, 'view_angle':30}
 cam = dict(
     position=(3,3,3),
     focal_point=(0.5, 0.5, 0.5),
@@ -181,19 +196,31 @@ cam = dict(
     clipping_range=(2.53177, 4.93023),
 )
 
-
 slice_list = []
 for i in range(len(mesh_obj_dict)):
     slice_list.append(mesh_obj_dict[i]['original'])
 
     plt = Plotter(size=(600,400), bg='GhostWhite')
-    plt.show(mesh_obj_dict[i]['slice'][3], mesh_obj_dict[i]['cut_plane'][3], mesh_obj_dict[i]['slice'][3].box().color('g').alpha(0.4),
-             mesh_obj_dict[i]['slice'][3].intersect_with(mesh_obj_dict[i]['cut_plane'][2]).color('p'), axes=1,
-            title="matplotlib colors", interactive=False)
-    #plt.show(mesh_obj_dict[i]['slice'], axes=0,
-    #        title="matplotlib colors", interactive=False, camera=cam)
-    plt.screenshot(filename=f'vase{i}.png')
-    #print(plt.camera)
+
+    #plt.show(mesh_obj_dict[i]['original'], axes=1, interactive=False)
+
+    for slice_index in range(num_of_slices):    
+        if slice_index == num_of_slices-1:
+            plt.show(
+                mesh_obj_dict[i]['slice'][slice_index],
+                mesh_obj_dict[i]['cut_plane'][slice_index], 
+                mesh_obj_dict[i]['slice'][slice_index].box().color('g').alpha(0.4), axes=1,
+                title="matplotlib colors", interactive=False)
+        else:
+            plt.show(
+                    mesh_obj_dict[i]['slice'][slice_index],
+                    mesh_obj_dict[i]['cut_plane'][slice_index], 
+                    mesh_obj_dict[i]['slice'][slice_index].box().color('g').alpha(0.4),
+                    mesh_obj_dict[i]['slice'][slice_index+1].intersect_with(mesh_obj_dict[i]['cut_plane'][slice_index]).color('p'), axes=1,
+                    title="matplotlib colors", interactive=False)
+
+
+    #plt.screenshot(filename=f'output/brain{i}.png')
     plt.interactive()
     plt.close()
 

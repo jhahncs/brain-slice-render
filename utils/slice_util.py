@@ -28,7 +28,7 @@ def combine_obj_files(_dir_list, output_dir):
                     print(fname)
                     _pcs = []
                     for line in infile:
-                        if line.lower().startswith('v'):
+                        if line.lower().startswith('v '):
                             _c += 1
                             _arr = line[2:].split()
                             _arr = np.array([float(a) for a in _arr])                    
