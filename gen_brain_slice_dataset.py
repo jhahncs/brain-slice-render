@@ -115,29 +115,33 @@ settings.tiff_orientation_type = 4
 random.seed(42)
 random.shuffle(_cmaps)
 
-#meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
-#meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
-meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
-print(meshes)
+
+if False:
+    #meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
+    #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
+    meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
+    print(meshes)
 
 
-meshes = meshes.tetralize().tomesh(fill=False)
-print(meshes)
-save(meshes,'C:/workkspace/brainrender/resources/reduced.obj',binary=False)
+    meshes = meshes.tetralize().tomesh(fill=False)
+    print(meshes)
+    save(meshes,'C:/workkspace/brainrender/resources/reduced.obj',binary=False)
 
-'''
-bb_ids = meshes.boundaries(non_manifold_edges=True, boundary_edges=True, return_cell_ids=True)
-print(bb_ids)
-meshes = meshes.delete_cells(bb_ids).clean()
-meshes = meshes.fill_holes(size=50)
-'''
+    '''
+    bb_ids = meshes.boundaries(non_manifold_edges=True, boundary_edges=True, return_cell_ids=True)
+    print(bb_ids)
+    meshes = meshes.delete_cells(bb_ids).clean()
+    meshes = meshes.fill_holes(size=50)
+    '''
 
-print('obj loaded')
-_vol = meshes.normalize().wireframe().binarize()
-
-print('converted into voxel')
+    print('obj loaded')
+    _vol = meshes.normalize().wireframe().binarize()
+    save(_vol, 'resources/reduced_vol.vti',binary=True)
+    print('converted into voxel')
+else:
+    _vol = Volume('resources/reduced_vol.vti')
 data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
-#_vol = Volume(dataurl + 'vase.vti')
+
 #_vol.dataset.GetPoints().SetData(_normalize(_vol.dataset.GetPoints().GetData()))
 
 _vol_norm = _vol.clone().isosurface(4, flying_edges=False).pos(0,0,0).color('yellow5', 0.5)
