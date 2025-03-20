@@ -115,16 +115,15 @@ settings.tiff_orientation_type = 4
 random.seed(42)
 random.shuffle(_cmaps)
 
-meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
+#meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
 #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
-#meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
+meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
 print(meshes)
-
-
 
 
 meshes = meshes.tetralize().tomesh(fill=False)
 print(meshes)
+save(meshes,'C:/workkspace/brainrender/resources/reduced.obj',binary=False)
 
 '''
 bb_ids = meshes.boundaries(non_manifold_edges=True, boundary_edges=True, return_cell_ids=True)
