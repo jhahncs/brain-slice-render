@@ -88,7 +88,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
 
         if DEBUG:
             mesh_obj_dict[vol_index]['slice'].append(_vol_norm_rotated_slice.clone())
-
+        
         _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
 
         #print( np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
