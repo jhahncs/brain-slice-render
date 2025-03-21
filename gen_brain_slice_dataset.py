@@ -38,10 +38,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
 
     if DEBUG:
 
-        #plt = Plotter(size=(600,400), bg='GhostWhite')
-        #plt.show(_vol_norm_rotated, axes=1, title="matplotlib colors", interactive=False)
-        #plt.interactive()
-        #plt.close()
+
         print('rotated')
         print('max', np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated.dataset.GetPoints().GetData()), axis=0) )
         print('min', np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated.dataset.GetPoints().GetData()), axis=0) )
@@ -116,16 +113,17 @@ random.seed(42)
 random.shuffle(_cmaps)
 
 
-if False:
+if True:
     #meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
     #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
-    meshes = load_obj('C:/workkspace/brainrender/resources/1089_375.obj')[0]
+    #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/375.obj')[0]
+    meshes = load_obj('resources/1089_8.obj')[0]
     print(meshes)
 
 
-    meshes = meshes.tetralize().tomesh(fill=False)
+    #meshes = meshes.tomesh()
     print(meshes)
-    save(meshes,'C:/workkspace/brainrender/resources/reduced.obj',binary=False)
+    save(meshes,'resources/reduced.obj',binary=False)
 
     '''
     bb_ids = meshes.boundaries(non_manifold_edges=True, boundary_edges=True, return_cell_ids=True)
@@ -138,6 +136,7 @@ if False:
     _vol = meshes.normalize().wireframe().binarize()
     save(_vol, 'resources/reduced_vol.vti',binary=True)
     print('converted into voxel')
+
 else:
     _vol = Volume('resources/reduced_vol.vti')
 data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
@@ -146,6 +145,11 @@ data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
 
 _vol_norm = _vol.clone().isosurface(4, flying_edges=False).pos(0,0,0).color('yellow5', 0.5)
 _normalize(_vol_norm)
+#plt = Plotter(size=(600,400), bg='GhostWhite')
+#plt.show(_vol_norm, axes=1, title="matplotlib colors", interactive=False)
+#plt.interactive()
+#plt.close()
+#exit()
 '''
 _data = _vol_norm.dataset.GetPoints().GetData()
 _data_np = numpy_support.vtk_to_numpy(_data)

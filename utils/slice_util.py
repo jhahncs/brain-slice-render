@@ -7,44 +7,61 @@ import random
 import time
 import itertools
 
+def _read_and_write_v(files, prefix, outfile):
 
-def combine_obj_files(_dir_list, output_dir):
-    _obj_list = []
+    #_v_list = []
+    f_2_last = []
+    
+    for _,fname in enumerate(files):
+        
+        _c = 0
+
+        with open(fname) as infile:
+            if fname.endswith('piece.obj'):
+                continue
+            print(fname)
+            _v = []
+            for line in infile:
+                if line.lower().startswith(f'{prefix} '):
+                    _c += 1
+                    _arr = line[2:].split()
+                    _arr = np.array([float(a) for a in _arr])                    
+                    _v.append(_arr)
+            
+            _v = np.array(_v)
+            #_pcs = np.array(_pcs)
+            #_pcs = trans_pc(_pcs)
+            #_pcs = rotate_pc(_pcs)
+            print(_v.shape)                                
+            #_v_list.append(_v)
+            
+            for _arr in _v:
+                #output_lines +=  f'v {_arr[0]} {_arr[1]} {_arr[2]}\n'
+                outfile.write(f'{prefix} {_arr[0]} {_arr[1]} {_arr[2]}\n')
+        f_2_last.append(_c)
+
+    return f_2_last
+                
+def combine_obj_files(_dir_list, output_obj_filename):
+
     for _dir in _dir_list:
         files = [_dir+"/"+f for f in os.listdir(_dir) if os.path.isfile(_dir+"/"+f)]
-        files.sort(key=lambda x: int(x.split("/")[-1].split("_")[-1].replace(".obj",'')), reverse=False)
+        files.sort(key=lambda x: int(x.split("/")[-1].split("_")[-1].replace(".obj",'')), reverse=True)
         
-        _pc_list = []
+        
+        _vn_list = []
         f_2_last = []
-        with open(output_dir+"/"+_dir.split("/")[-1]+".obj", 'w') as outfile:
+
+        #with open(output_dir+"/"+_dir.split("/")[-1]+".obj", 'w') as outfile:
+        with open(output_obj_filename, 'w') as outfile:
 
             f_2_last.append(0)
-            for _,fname in enumerate(files):
-                
-                _c = 0
-                with open(fname) as infile:
-                    if fname.endswith('piece.obj'):
-                        continue
-                    print(fname)
-                    _pcs = []
-                    for line in infile:
-                        if line.lower().startswith('v '):
-                            _c += 1
-                            _arr = line[2:].split()
-                            _arr = np.array([float(a) for a in _arr])                    
-                            _pcs.append(_arr)
-                    
-                    _pcs = np.array(_pcs)
-                    #_pcs = np.array(_pcs)
-                    #_pcs = trans_pc(_pcs)
-                    #_pcs = rotate_pc(_pcs)
-                    print(_pcs.shape)                                
-                    _pc_list.append(_pcs)
-                    
-                    for _arr in _pcs:
-                        outfile.write(f'v {_arr[0]} {_arr[1]} {_arr[2]}\n')
 
-                f_2_last.append(_c)
+            _f_2_last = _read_and_write_v(files, "v", outfile)
+            f_2_last.extend(_f_2_last)
+           
+
+            _read_and_write_v(files, "vn", outfile)
 
             _delta = 0
             for fi, fname in enumerate(files):
@@ -56,8 +73,7 @@ def combine_obj_files(_dir_list, output_dir):
                         if line.lower().startswith('f'):
                             _arr = line[2:].split()
                             outfile.write(f'f {int(_arr[0])+_delta} {int(_arr[1])+_delta} {int(_arr[2])+_delta}\n')
-        _obj_list.append(_pc_list)
-    return _obj_list
+
 
 '''
 # very slow
