@@ -41,39 +41,45 @@ def _read_and_write_v(files, prefix, outfile):
         f_2_last.append(_c)
 
     return f_2_last
-                
-def combine_obj_files(_dir_list, output_obj_filename):
+
+
+def combine_obj_file_list(_file_list, output_obj_filename):
+
+
+    _vn_list = []
+    f_2_last = []
+
+    #with open(output_dir+"/"+_dir.split("/")[-1]+".obj", 'w') as outfile:
+    with open(output_obj_filename, 'w') as outfile:
+
+        f_2_last.append(0)
+
+        _f_2_last = _read_and_write_v(_file_list, "v", outfile)
+        f_2_last.extend(_f_2_last)
+        
+
+        _read_and_write_v(_file_list, "vn", outfile)
+
+        _delta = 0
+        for fi, fname in enumerate(_file_list):
+            _delta += f_2_last[fi]
+            with open(fname) as infile:
+                if fname.endswith('piece.obj'):
+                    continue                
+                for line in infile:
+                    if line.lower().startswith('f'):
+                        _arr = line[2:].split()
+                        outfile.write(f'f {int(_arr[0])+_delta} {int(_arr[1])+_delta} {int(_arr[2])+_delta}\n')
+
+
+
+def combine_obj_files(_dir_list, output_dir):
 
     for _dir in _dir_list:
         files = [_dir+"/"+f for f in os.listdir(_dir) if os.path.isfile(_dir+"/"+f)]
         files.sort(key=lambda x: int(x.split("/")[-1].split("_")[-1].replace(".obj",'')), reverse=True)
         
-        
-        _vn_list = []
-        f_2_last = []
-
-        #with open(output_dir+"/"+_dir.split("/")[-1]+".obj", 'w') as outfile:
-        with open(output_obj_filename, 'w') as outfile:
-
-            f_2_last.append(0)
-
-            _f_2_last = _read_and_write_v(files, "v", outfile)
-            f_2_last.extend(_f_2_last)
-           
-
-            _read_and_write_v(files, "vn", outfile)
-
-            _delta = 0
-            for fi, fname in enumerate(files):
-                _delta += f_2_last[fi]
-                with open(fname) as infile:
-                    if fname.endswith('piece.obj'):
-                        continue                
-                    for line in infile:
-                        if line.lower().startswith('f'):
-                            _arr = line[2:].split()
-                            outfile.write(f'f {int(_arr[0])+_delta} {int(_arr[1])+_delta} {int(_arr[2])+_delta}\n')
-
+        combine_obj_file_list(files, output_dir+"/"+_dir.split("/")[-1]+".obj")
 
 '''
 # very slow
