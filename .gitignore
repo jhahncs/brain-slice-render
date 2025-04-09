@@ -4,7 +4,7 @@ examples/*.mp4
 tests/*.mp4
 *.xlsx
 *.csv
-
+web/static
 .pytest_cache
 __pycache__
 *.pyc

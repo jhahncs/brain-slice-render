@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - multiple elements</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		
+        <script src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+
+
+		<style>
+
+            * {
+				box-sizing: border-box;
+				-moz-box-sizing: border-box;
+			}
+
+			body {
+				background-color: #fff;
+				color: #444;
+			}
+            #c {
+				position: absolute;
+				left: 0;
+				width: 100%;
+				height: 100%;
+			}
+
+            
+			#content {
+				position: absolute;
+				top: 0; 
+                width: 100%;
+				z-index: 1;
+				padding: 10 0 0 0;
+			}
+
+            .item {
+                position: relative;
+                width: 100%;
+
+			}
+			.list-item {
+				display: grid;
+                column-gap: 2;
+				margin: 2;
+				padding: 2;
+				box-shadow: 1px 2px 4px 0px rgba(0,0,0,0.25);
+                grid-template-columns: 400 200;
+                grid-template-rows: 200  200 200;
+			}
+            .item:nth-child(1) {
+                grid-column-start: 1;
+                grid-column-end: 3;
+                grid-row-start: 1;
+                grid-row-end: 2;
+            }
+            .item:nth-child(2) {
+                grid-column-start: 1;
+                grid-column-end: 2;
+                grid-row-start: 2;
+                grid-row-end: 4;
+            }
+		</style>
+
+        
+        <script type="importmap">
+            {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@v0.149.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@v0.149.0/examples/jsm/"
+            }
+            }
+        </script>
+
+
+        <script type="module">
+
+            import * as THREE from 'three';
+
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+            import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+            //import { DragControls } from 'three/addons/controls/DragControls.js';
+			import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+            //let canvas, renderer;
+            //let object, group;
+            const objects = [];
+            const scenes = [];
+            let content_canvas, renderer;
+            let enableSelection = true;
+            const mouse = new THREE.Vector2();
+            const aspect = window.innerWidth / window.innerHeight;
+
+            const frustumSize = 5;
+            /*
+            cameraPersp = new THREE.PerspectiveCamera( 50, aspect, 0.1, 100 );
+            cameraOrtho = new THREE.OrthographicCamera( - frustumSize * aspect, frustumSize * aspect, frustumSize, - frustumSize, 0.1, 100 );
+            currentCamera = cameraPersp;
+
+            currentCamera.position.set(0,2,0);
+            */
+
+            content_canvas = document.getElementById( 'c' );
+
+            renderer = new THREE.WebGLRenderer( { canvas:content_canvas, antialias: true } );
+            renderer.setClearColor( 0x000000, 1 );
+            renderer.setPixelRatio( window.devicePixelRatio );
+            //renderer.setSize( window.innerWidth, window.innerHeight );
+            //renderer.setSize( 800,400);       
+            
+            //const results = await Promise.all(func_arr);
+            //console.log("finish");
+            //console.log(objects.length);
+
+            //animate()
+            //console.log(renderer)
+
+            
+
+
+
+            //const file_names_ann = ['/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Dembamaps/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s003_nl.png',
+             //   '/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Dembamaps/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s005_nl.png'
+           // ]
+            //const file_names_raw = ['/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s003.png',
+             //   '/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s005.png'
+            //]
+
+            $(document).ready(function() {
+                let obj_urls = get_filenames({{ obj_urls | tojson }});
+                let raw_urls = get_filenames({{ raw_urls | tojson }});
+                let ann_urls = get_filenames({{ ann_urls | tojson }});
+
+                
+
+                init(obj_urls, raw_urls, ann_urls);
+            });
+            
+            function get_filenames(obj_urls_temp) {
+                let obj_urls = JSON.parse(obj_urls_temp)
+                let obj_urls_new = []
+
+                for(let i=0; i < obj_urls.length; i++){
+                    let obj_url = obj_urls[i];
+                    obj_urls_new.push(obj_url.replace('%5C','/') )
+                }    
+                return obj_urls_new;
+
+            }
+
+            async  function init(file_names ,file_names_raw, file_names_ann) {
+
+                
+                
+
+
+                let func_arr = []
+                for ( let i = 0; i < 4; i ++ ) {
+                    let _file = file_names[i].split("/");
+                    let data_id = _file[_file.length-1].split(".")[0];
+                    const content = document.getElementById( 'content' );
+                    // make a list item
+                    const element = document.createElement( 'div' );
+                    element.className = 'list-item';
+
+                    content.appendChild( element );
+
+
+
+                    const descriptionElement = document.createElement( 'div' );
+                    descriptionElement.className = 'item';
+                    descriptionElement.innerText = data_id;
+                    element.appendChild( descriptionElement );
+
+
+                    const scene = new THREE.Scene();
+
+                    scenes.push( scene );
+
+
+                    const axesHelper = new THREE.AxesHelper(2)
+                    scene.add(axesHelper)
+                    
+                    
+                    //renderer = new THREE.WebGLRenderer( { antialias: true } );
+
+                    
+                    
+                    //renderer.setViewport(0,0,1,1);
+                    //renderer.setAnimationLoop( animate );
+
+                    const sceneElement = document.createElement( 'div' );
+                    sceneElement.className = 'item';
+                    const sceneElement_3d = document.createElement( 'div' );
+                    sceneElement_3d.className = '3d'
+                    sceneElement_3d.width = '800'
+                    sceneElement_3d.height = '800'
+                    //sceneElement.appendChild( renderer.domElement );
+                    sceneElement.appendChild( sceneElement_3d );
+                    scene.userData.element = sceneElement_3d;
+
+                    element.appendChild(sceneElement );
+                    
+
+                    const sceneElement2 = document.createElement( 'div' );
+                    sceneElement2.className = 'item';
+                    element.appendChild( sceneElement2 );
+
+                    const imgElement1 = document.createElement( 'img' );
+                    imgElement1.className = 'item-img';
+                    imgElement1.src = file_names_ann[i]
+                    //imgElement1.width = '200'
+                    imgElement1.height = '200'
+                    sceneElement2.appendChild(imgElement1)
+                    
+
+
+                    const sceneElement3 = document.createElement( 'div' );
+                    sceneElement3.className = 'item';
+                    element.appendChild( sceneElement3 );
+
+                    const imgElement2 = document.createElement( 'img' );
+                    imgElement2.className = 'item-img';
+                    imgElement2.src = file_names_raw[i]
+                    //imgElement2.width = '200'
+                    imgElement2.height = '200'
+                    sceneElement3.appendChild(imgElement2)
+                    
+
+                    
+
+                    //scene.add( new THREE.GridHelper( 5, 10, 0x888888, 0x444444 ) );
+
+
+ 
+                    //scene.userData.camera = camera;
+
+
+
+                    //scene.userData.controls = controls;
+
+
+                    //const light = new THREE.DirectionalLight( 0xff0000, 1.5 );
+                    //light.position.set( 1, 1, 1 );
+                    //scene.add( light );
+
+
+                    const loader = new OBJLoader( );
+
+                    async function asyncFunc1(obj) {
+                        
+
+                                                //renderer.render( scene, camera );
+
+                        //requestAnimationFrame( animate );
+                        //render();
+
+                        
+
+                        
+
+                        //return Promise.resolve(1);
+                        console.log("asyncFUnc2")
+                        
+                    }
+
+                    let func_loaded = asyncFunc1;
+                    func_arr.push(func_loaded)
+                    // load a resource
+
+                    const loadedModel = await  loader.loadAsync (
+                        // resource URL
+                        file_names[i],
+                        // called when resource is loaded
+                        func_loaded,
+                        // called when loading is in progress
+                        function ( xhr ) {
+                            console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+                        },
+                        // called when loading has errors
+                        function ( error ) {
+                            console.error(error);
+
+                        }
+                    );
+
+                    if (loadedModel) {
+                        console.log("loaded")
+                        console.log(loadedModel)
+
+                        
+                        
+                        loadedModel.traverse( function( o ) {
+                            if ( o.isPoints )
+                            {
+                                scene.add( o );
+                                scene.userData.obj = o;
+                                //o.translateX(2);
+                                objects.push( o );
+                                //const controls_drag = new DragControls( [ o ], camera, renderer.domElement );
+                                //controls_drag.setMode( 'rotate' )
+
+                                const camera = new THREE.PerspectiveCamera( 50, aspect, 0.000001, 10 );
+                                scene.userData.camera = camera
+                                const orbit = new OrbitControls(camera, scene.userData.element );
+                                scene.userData.orbit = orbit
+                                //orbit.minDistance = -2;
+                                //orbit.maxDistance = 5;             
+                                //orbit.rotateSpeed = -0.25       
+                                //orbit.enablePan = false;
+                                //controls.target.set(new THREE.Vector3(2,0,2))
+                                //orbit.enableZoom = true;
+                                
+                                orbit.update();
+                                orbit.addEventListener( 'change', animate );
+
+                                const control = new TransformControls( camera, scene.userData.element );
+                                scene.userData.control = control
+                                control.addEventListener( 'change', animate );
+                                control.addEventListener( 'dragging-changed', function ( event ) {
+
+                                    orbit.enabled = ! event.value;
+
+                                } );
+
+                                const position = camera.position.clone();
+                                camera.position.copy( position );
+
+                                orbit.object = camera;
+                                control.camera = camera;
+
+                                control.showX = true
+                                control.showY = true
+                                control.showZ = true
+                                //camera.zoom = 3
+                                // red x
+                                // blue z
+                                // green y
+                                //if (i==0)                       
+
+                                    
+                                camera.position.x = 0.5
+                                camera.position.y = 1.2
+                                camera.position.z = 0.45
+
+                                camera.rotation.x = -1.5
+                                camera.rotation.y = 0
+                                camera.rotation.z = 0
+
+                                orbit.target.x = 0.5
+                                orbit.target.y = 0
+                                orbit.target.z = 0.45
+                                    
+                                    //Camera Position: 0.5741929772040216 0.8961178092152369 0.4321825287066512
+                                    //Camera Rotation: -1.570795326918264 -1.5707317408547583e-8 -0.015707963362945058
+                                    //obit target: 0.5741929943087092 -0.1928451952503207 0.4321814398779894
+
+                                
+
+                                camera.lookAt( orbit.target.x, orbit.target.y, orbit.target.z );
+                                //camera.lookAt( 2,0,2 );
+                                //console.log('-----------')
+                                //console.log(position);
+                                //console.log( orbit.target.x, orbit.target.y, orbit.target.z );
+
+                                control.setSpace('local')
+                                scene.add( new THREE.GridHelper( 2, 10, 0x888888, 0x444444 ) );
+                                //const gizmo = control.getHelper();
+                                //scene.add( gizmo );
+                                control.setMode( 'rotate' );
+                                control.attach(scene.userData.obj );
+
+                                
+                            }
+
+                        } );
+
+                    }
+                    //scene.add( new THREE.Mesh( geometry, material ) );
+
+                    //scene.add( new THREE.HemisphereLight( 0xaaaaaa, 0x444444, 3 ) );
+
+
+                    
+
+                    //scenes.push( scene );
+                    
+
+                }
+
+                //renderer.setAnimationLoop( animate );
+                animate()
+
+            }
+            
+
+            
+            function animate() {
+                
+				updateSize();
+
+                //content_canvas.style.transform = `translateY(${window.scrollY}px)`;
+
+                renderer.setClearColor( 0xffffff );
+                renderer.setScissorTest( false );
+                renderer.clear();
+
+                renderer.setClearColor( 0xe0e0e0 );
+                renderer.setScissorTest( true );
+
+                scenes.forEach( function ( scene ) {
+                
+                    //console.log(renderer)
+                    const domElement = scene.userData.element;
+                    const camera = scene.userData.camera;
+
+                    // get the element that is a place holder for where we want to
+                    // draw the scene
+                    const element = scene.userData.element;
+
+                    // get its position relative to the page's viewport
+                    const rect = element.getBoundingClientRect();
+                    console.log(element)
+                    console.log(rect)
+                    console.log(element.clientWidth,element.clientHeight)
+                    // check if it's offscreen. If so skip it
+                    if ( rect.bottom < 0 || rect.top > element.clientHeight ||
+                        rect.right < 0 || rect.left > element.clientWidth ) {
+
+//return; // it's off screen
+
+                    }
+                    //element.clientHeight  = 200
+                    // set the viewport
+                    const width = rect.right - rect.left;
+                    const height = rect.bottom - rect.top;
+                    const left = rect.left;
+                    //const bottom = element.clientHeight - rect.bottom;
+                    const bottom = 1000 - rect.bottom;
+                    renderer.setViewport( left, bottom, width, height );
+                    renderer.setScissor( left, bottom, width, height );
+
+                    console.log(left, bottom, width, height)
+                
+                    renderer.render( scene, camera );
+
+                } );
+
+            }
+            
+
+            
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+            }
+            function onClick( event ) {
+
+                event.preventDefault();
+                console.log(enableSelection);
+                if ( enableSelection === true ) {
+
+                    const draggableObjects = controls.objects;
+                    draggableObjects.length = 0;
+                    console.log(event.clientX);
+
+                    mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+                    mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+
+                    controls.transformGroup = false;
+                    draggableObjects.push( ...objects );
+
+
+
+                }
+
+                render();
+
+            }
+
+
+
+
+            function updateSize() {
+
+                const width = content_canvas.clientWidth;
+                const height = content_canvas.clientHeight;
+
+                if ( content_canvas.width !== width || content_canvas.height !== height ) {
+
+                    renderer.setSize( width, height, false );
+
+                }
+
+            }
+/*
+            function animate() {
+
+                updateSize();
+
+                //renderer.setSize( 250, 250, false );
+
+
+                //console.log("anmi")
+                //canvas.style.transform = `translateY(${window.scrollY}px)`;
+
+                //renderer.setClearColor( 0xffffff );
+                //renderer.setScissorTest( false );
+                renderer.clear();
+
+                //renderer.setClearColor( 0xe0e0e0 );
+                renderer.setClearColor( 0x000000 );
+                renderer.setScissorTest( true );
+                
+                scenes.forEach( function ( scene ) {
+
+                    // so something moves
+                    //scene.children[ 0 ].rotation.y = Date.now() * 0.001;
+
+                    // get the element that is a place holder for where we want to
+                    // draw the scene
+                    const element = scene.userData.element;
+
+                    // get its position relative to the page's viewport
+                    const rect = element.getBoundingClientRect();
+
+                    // check if it's offscreen. If so skip it
+                    if ( rect.bottom < 0 || rect.top > renderer.domElement.clientHeight ||
+                        rect.right < 0 || rect.left > renderer.domElement.clientWidth ) {
+
+                        return; // it's off screen
+
+                    }
+
+                    // set the viewport
+                    const width = rect.right - rect.left ;
+                    const height = rect.bottom - rect.top ;
+                    const left = rect.left;
+                    const bottom = renderer.domElement.clientHeight - rect.bottom ;
+                    //console.log( left, bottom, width, height )
+                    //renderer.setViewport( left-300, bottom-100, width+300, height+300 );
+                    renderer.setViewport( left, bottom , width, height -50 );
+                    renderer.setScissor( left, bottom +100, width - 50, height -50);
+
+                    const camera = scene.userData.camera;
+
+                    //camera.aspect = width / height; // not changing in this example
+                    //camera.updateProjectionMatrix();
+
+                    //scene.userData.controls.update();
+
+                    renderer.render( scene, camera );
+
+                } );
+
+            }*/
+
+        </script>
+	</head>
+	<body>
+        <canvas id="c"></canvas>
+			
+		</canvas>
+
+		<div id="content">
+			
+		</div>
+
+
+	</body>
+</html>

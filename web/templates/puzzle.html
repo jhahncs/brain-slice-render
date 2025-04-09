@@ -1,0 +1,112 @@
+<html>
+    <head>
+        
+    </head>
+    <body>
+        <table width="800">
+
+
+              {% for id in id_list %}
+
+                    
+                    <tr width="100%">
+                        <td colspan=3 ><center><h2>{{ id }} parts</h2></center></td>
+                    </tr>
+                    
+                    
+                    <tr width="100%">
+                        <td >
+                            <img src='/static/results_{{ id }}_parts_puzzleplusplus/0/gt.png'>
+                        </td>
+                        <td >
+                            <img src='/static/results_{{ id }}_parts_puzzleplusplus/1/gt.png'>
+                        </td>
+                        <td >
+                            <img src='/static/results_{{ id }}_parts_puzzleplusplus/2/gt.png'>
+                        </td>
+
+                        
+                    </tr>
+        
+                    
+                    <tr width="100%">
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_{{ id }}_parts_puzzleplusplus/0/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_{{ id }}_parts_puzzleplusplus/1/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_{{ id }}_parts_puzzleplusplus/2/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+
+                        
+                    </tr>
+        
+        
+        
+                    
+              {% endfor %}
+
+            
+            
+
+                    <tr width="100%">
+                        <td colspan=3 ><center><h2>2_to_10 parts</h2></center></td>
+                    </tr>
+                    
+                    
+                    <tr width="100%">
+                        <td >
+                            <img src='/static/results_2_to_10_parts_puzzleplusplus/0/gt.png'>
+                        </td>
+                        <td >
+                            <img src='/static/results_2_to_10_parts_puzzleplusplus/30/gt.png'>
+                        </td>
+                        <td >
+                            <img src='/static/results_2_to_10_parts_puzzleplusplus/87/gt.png'>
+                        </td>
+
+                        
+                    </tr>
+        
+                    
+                    <tr width="100%">
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_2_to_10_parts_puzzleplusplus/0/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_2_to_10_parts_puzzleplusplus/30/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+                        <td width="25%">
+                <video id="replay-video" autoplay controls muted preload playsinline width="100%">
+                  <source src="/static/results_2_to_10_parts_puzzleplusplus/87/video.mp4" type="video/mp4">
+                </video>
+                            
+                        </td>
+
+                        
+                    </tr>
+
+            
+        </table>
+
+        
+    </body>
+    
+</html>

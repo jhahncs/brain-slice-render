@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - multiple elements</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+        <script src="{{url_for('static', filename='js/jquery-3.7.1.min.js')}}"></script>
+
+
+		<style>
+
+
+
+
+			a {
+				color: #08f;
+			}
+
+			#content {
+				position: absolute;
+				top: 0; 
+                width: 100%;
+				z-index: 1;
+				padding: 10 0 0 0;
+			}
+
+			#c {
+				position: absolute;
+				left: 0;
+				width: 100%;
+				height: 100%;
+			}
+            .item {
+                position: relative;
+
+                
+
+			}
+			.list-item {
+				display: grid;
+                column-gap: 2;
+				margin: 2;
+				padding: 2;
+				box-shadow: 1px 2px 4px 0px rgba(0,0,0,0.25);
+                grid-template-columns: 200 200;
+                grid-template-rows: 200  200;
+			}
+            .item:nth-child(1) {
+                grid-column-start: 1;
+                grid-column-end: 3;
+                grid-row-start: 1;
+                grid-row-end: 2;
+            }
+            .item:nth-child(2) {
+                grid-column-start: 1;
+                grid-column-end: 2;
+                grid-row-start: 1;
+                grid-row-end: 4;
+            }
+		</style>
+
+        
+        <script type="importmap">
+            {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@v0.149.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@v0.149.0/examples/jsm/"
+            }
+            }
+        </script>
+
+
+        <script type="module">
+
+            import * as THREE from 'three';
+
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+            import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+            import { DragControls } from 'three/addons/controls/DragControls.js';
+
+            let canvas, renderer;
+            let object, group;
+            const objects = [];
+            const scenes = [];
+            let enableSelection = true;
+            const mouse = new THREE.Vector2();
+
+
+            //const file_names_ann = ['/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Dembamaps/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s003_nl.png',
+             //   '/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Dembamaps/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s005_nl.png'
+           // ]
+            //const file_names_raw = ['/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s003.png',
+             //   '/static/0083/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal/Atlas Registration/Mouse_0083_Lhem_cFos_647_PV_488_Sagittal_s005.png'
+            //]
+
+            $(document).ready(function() {
+                let obj_urls = get_filenames({{ obj_urls | tojson }});
+                let raw_urls = get_filenames({{ raw_urls | tojson }});
+                let ann_urls = get_filenames({{ ann_urls | tojson }});
+
+                
+
+                init(obj_urls, raw_urls, ann_urls);
+            });
+            
+            function get_filenames(obj_urls_temp) {
+                let obj_urls = JSON.parse(obj_urls_temp)
+                let obj_urls_new = []
+
+                for(let i=0; i < obj_urls.length; i++){
+                    let obj_url = obj_urls[i];
+                    obj_urls_new.push(obj_url.replace('%5C','/') )
+                }    
+                return obj_urls_new;
+
+            }
+
+            function init(file_names ,file_names_raw, file_names_ann) {
+
+
+                
+                canvas = document.getElementById( 'c' );
+
+
+                const content = document.getElementById( 'content' );
+
+                renderer = new THREE.WebGLRenderer( { canvas: canvas, antialias: true } );
+                //renderer = new THREE.WebGLRenderer( { antialias: true } );
+                renderer.setClearColor( 0xff0000, 1 );
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setSize( window.innerWidth, window.innerHeight );
+                
+				//document.body.appendChild( renderer.domElement );
+                //renderer.setViewport(0,0,1,1);
+                renderer.setAnimationLoop( animate );
+                //renderer.setSize( 100, 100, false );
+
+                for ( let i = 0; i < 3; i ++ ) {
+                    let _file = file_names[i].split("/");
+                    let data_id = _file[_file.length-1].split(".")[0];
+                    
+                    // make a list item
+                    const element = document.createElement( 'div' );
+                    element.className = 'list-item';
+
+
+                    const descriptionElement = document.createElement( 'div' );
+                    descriptionElement.className = 'item';
+                    descriptionElement.innerText = data_id;
+                    element.appendChild( descriptionElement );
+
+
+                    const sceneElement = document.createElement( 'div' );
+                    sceneElement.className = 'item';
+                    element.appendChild( sceneElement );
+
+                    //const imgElement = document.createElement( 'img' );
+                    //imgElement.src = file_names_ann[i]
+                    //imgElement.width = '400'
+                    //imgElement.height = '300'
+                    //sceneElement.appendChild(imgElement)
+                    
+
+                    const sceneElement2 = document.createElement( 'div' );
+                    sceneElement2.className = 'item';
+                    element.appendChild( sceneElement2 );
+
+                    const imgElement1 = document.createElement( 'img' );
+                    imgElement1.className = 'item-img';
+                    imgElement1.src = file_names_ann[i]
+                    imgElement1.width = '250'
+                    //imgElement1.height = '300'
+                    sceneElement2.appendChild(imgElement1)
+                    
+
+
+                    const sceneElement3 = document.createElement( 'div' );
+                    sceneElement3.className = 'item';
+                    element.appendChild( sceneElement3 );
+
+                    const imgElement2 = document.createElement( 'img' );
+                    imgElement2.className = 'item-img';
+                    imgElement2.src = file_names_raw[i]
+                    imgElement2.width = '250'
+                    //imgElement2.height = '300'
+                    sceneElement3.appendChild(imgElement2)
+                    
+
+
+
+
+                    // the element that represents the area we want to render the scene					
+                    content.appendChild( element );
+                    
+
+
+
+                    
+                    const scene = new THREE.Scene();
+                    const axesHelper = new THREE.AxesHelper(2)
+                    scene.add(axesHelper)
+                    scene.add( new THREE.GridHelper( 5, 10, 0x888888, 0x444444 ) );
+
+                    scene.userData.element = sceneElement;
+                    function loadModel() {
+
+                        //object.traverse( function ( child ) {
+
+                        //    if ( child.isMesh ) child.material.map = texture;
+
+                        //} );
+
+                        //object.position.y = - 0.95;
+                        //object.scale.setScalar( 0.01 );
+                        scene.add( object );
+                        objects.push(object)
+                        render();
+
+                    }
+
+                    const manager = new THREE.LoadingManager( loadModel );
+
+                    function onProgress( xhr ) {
+
+                        if ( xhr.lengthComputable ) {
+
+                            const percentComplete = xhr.loaded / xhr.total * 100;
+                            console.log( 'model ' + percentComplete.toFixed( 2 ) + '% downloaded' );
+
+                        }
+
+                    }
+
+                    function onError() {}
+
+
+                    const aspect = window.innerWidth / window.innerHeight;
+
+                    const frustumSize = 5;
+        /*
+                    cameraPersp = new THREE.PerspectiveCamera( 50, aspect, 0.1, 100 );
+                    cameraOrtho = new THREE.OrthographicCamera( - frustumSize * aspect, frustumSize * aspect, frustumSize, - frustumSize, 0.1, 100 );
+                    currentCamera = cameraPersp;
+
+                    currentCamera.position.set(0,2,0);
+        */
+
+                    const camera = new THREE.PerspectiveCamera( 50, aspect, 0.1, 100 );
+                    camera.position.x = 0;
+                    camera.position.y = 3;
+                    camera.position.z = 0;
+                    scene.userData.camera = camera;
+
+                    const controls = new OrbitControls( scene.userData.camera, scene.userData.element );
+                    //controls.minDistance = -2;
+                    //controls.maxDistance = 5;
+                    
+                    controls.enablePan = true;
+                    controls.enableZoom = true;
+                    controls.update();
+
+                    scene.userData.controls = controls;
+
+                    // add one random mesh to each scene
+                    
+                    const material = new THREE.MeshStandardMaterial( {
+
+                        color: new THREE.Color().setHSL( Math.random(), 1, 0.75, THREE.SRGBColorSpace ),
+                        roughness: 0.5,
+                        metalness: 0,
+                        flatShading: true
+
+                    } );
+
+
+
+
+                    const loader = new OBJLoader( manager );
+                    loader.load( file_names[i], function ( obj ) {
+
+                        object = obj;
+
+                    }, onProgress, onError );
+
+
+
+                    function render() {
+
+                        renderer.render( scene, camera );
+
+                    }
+                    
+
+                    //scene.add( new THREE.Mesh( geometry, material ) );
+
+                    //scene.add( new THREE.HemisphereLight( 0xaaaaaa, 0x444444, 3 ) );
+
+                    const light = new THREE.DirectionalLight( 0xff0000, 1.5 );
+                    light.position.set( 1, 1, 1 );
+                    scene.add( light );
+
+                    scenes.push( scene );
+
+                    const controls_drag = new DragControls( [ ... objects ], camera, renderer.domElement );
+                    controls_drag.rotateSpeed = 1;
+                    controls_drag.addEventListener( 'drag', render );
+
+                }
+
+
+
+            }
+            
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+            }
+            function onClick( event ) {
+
+                event.preventDefault();
+                console.log(enableSelection);
+                if ( enableSelection === true ) {
+
+                    const draggableObjects = controls.objects;
+                    draggableObjects.length = 0;
+                    console.log(event.clientX);
+
+                    mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+                    mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+
+                    controls.transformGroup = false;
+                    draggableObjects.push( ...objects );
+
+
+
+                }
+
+                render();
+
+            }
+
+
+
+
+            function updateSize() {
+
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+                //const width = 400;
+                //const height = 300;
+                //console.log(canvas.clientWidt, canvas.clientHeight, canvas.width, canvas.clientWidt)
+                if ( canvas.width !== width || canvas.height !== height ) {
+                    renderer.setSize( width, height/2, false );
+
+                }
+                renderer.setSize( width, height*2, false );
+                //renderer.setSize(1055,255,false)
+
+            }
+
+            function animate() {
+
+                updateSize();
+
+                //renderer.setSize( 250, 250, false );
+
+
+                //console.log("anmi")
+                //canvas.style.transform = `translateY(${window.scrollY}px)`;
+
+                //renderer.setClearColor( 0xffffff );
+                //renderer.setScissorTest( false );
+                renderer.clear();
+
+                //renderer.setClearColor( 0xe0e0e0 );
+                renderer.setClearColor( 0x000000 );
+                renderer.setScissorTest( true );
+                
+                scenes.forEach( function ( scene ) {
+
+                    // so something moves
+                    //scene.children[ 0 ].rotation.y = Date.now() * 0.001;
+
+                    // get the element that is a place holder for where we want to
+                    // draw the scene
+                    const element = scene.userData.element;
+
+                    // get its position relative to the page's viewport
+                    const rect = element.getBoundingClientRect();
+
+                    // check if it's offscreen. If so skip it
+                    if ( rect.bottom < 0 || rect.top > renderer.domElement.clientHeight ||
+                        rect.right < 0 || rect.left > renderer.domElement.clientWidth ) {
+
+                        return; // it's off screen
+
+                    }
+
+                    // set the viewport
+                    const width = rect.right - rect.left ;
+                    const height = rect.bottom - rect.top ;
+                    const left = rect.left;
+                    const bottom = renderer.domElement.clientHeight - rect.bottom ;
+                    //console.log( left, bottom, width, height )
+                    //renderer.setViewport( left-300, bottom-100, width+300, height+300 );
+                    renderer.setViewport( left, bottom , width, height -50 );
+                    renderer.setScissor( left, bottom +100, width - 50, height -50);
+
+                    const camera = scene.userData.camera;
+
+                    //camera.aspect = width / height; // not changing in this example
+                    //camera.updateProjectionMatrix();
+
+                    //scene.userData.controls.update();
+
+                    renderer.render( scene, camera );
+
+                } );
+
+            }
+
+        </script>
+	</head>
+	<body>
+
+		<canvas id="c"></canvas>
+
+		<div id="content">
+			
+		</div>
+
+
+	</body>
+</html>
