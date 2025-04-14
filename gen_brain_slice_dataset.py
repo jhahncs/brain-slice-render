@@ -6,15 +6,7 @@ from operator import itemgetter
 import os
 from vtk.util import numpy_support
 import multiprocessing
-
-def _normalize(_vol):
-    _data = _vol.dataset.GetPoints().GetData()
-    _data_np = numpy_support.vtk_to_numpy(_data)
-    _data_np = _data_np - np.min(_data_np, axis=0)
-    _data_np = _data_np  / np.max(_data_np, axis=0)
-    #return numpy_support.numpy_to_vtk(_data_np)
-    _vol.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
-    #return _vol
+from utils import slice_util
 
 def process_task(_dir_surfix, num_of_slices, vol_index):
     global _vol_norm
@@ -29,7 +21,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
 
 
     _vol_norm_rotated = _vol_norm.clone().rotate(random.randint(1,90), axis=v, point=p).color('blue5', 0.5)
-    _normalize(_vol_norm_rotated)
+    slice_util._normalize(_vol_norm_rotated)
 
 
     [xmin,xmax, ymin,ymax, zmin,zmax] = _vol_norm_rotated.bounds()
@@ -47,7 +39,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
         mesh_obj_dict[vol_index] = {}
         mesh_obj_dict[vol_index]['original'] = _vol_norm_rotated
         print('bounds',[xmin,xmax, ymin,ymax, zmin,zmax] )
-
+        mesh_obj_dict[vol_index]['flat'] = []
         mesh_obj_dict[vol_index]['slice'] = []
         mesh_obj_dict[vol_index]['cut_plane'] = []
         mesh_obj_dict[vol_index]['box'] = []
@@ -72,10 +64,11 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
         #top_box.project_on_plane('y')
         if slice_index == 0:
             _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).color(_color, slice_color_alpha)
+
+
             if DEBUG:
                 mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
                 mesh_obj_dict[vol_index]['box'].append(top_box.color('r').alpha(0.4))
-                #print('top_box',top_box)
         elif  slice_index == num_of_slices - 1:
             _vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
             if DEBUG:
@@ -91,9 +84,15 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
         if DEBUG:
             mesh_obj_dict[vol_index]['slice'].append(_vol_norm_rotated_slice.clone())
         
-        _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+        _points = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
 
-        #print( np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
+        _points = slice_util.make_boundary_xyz_flat(_points)
+        Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
+        mesh_obj_dict[vol_index]['flat'].append( Points(_points) )
+        _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+        print(f'{_dir}/piece_{slice_index}.obj')
+        #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
+        #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
         #slice_list.append(_vol_norm_rotated_slice)
 
     if DEBUG:
@@ -144,7 +143,7 @@ data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
 #_vol.dataset.GetPoints().SetData(_normalize(_vol.dataset.GetPoints().GetData()))
 
 _vol_norm = _vol.clone().isosurface(4, flying_edges=False).pos(0,0,0).color('yellow5', 0.5)
-_normalize(_vol_norm)
+slice_util._normalize(_vol_norm)
 #plt = Plotter(size=(600,400), bg='GhostWhite')
 #plt.show(_vol_norm, axes=1, title="matplotlib colors", interactive=False)
 #plt.interactive()
@@ -164,7 +163,7 @@ print('min', np.min(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().Get
 
 
 DEBUG = True
-num_of_slices = 6
+num_of_slices = 20
 if DEBUG:
     mesh_obj_dict = process_task("output",num_of_slices,0)
 else:
@@ -202,7 +201,7 @@ cam = dict(
     distance=1.562,
     clipping_range=(2.53177, 4.93023),
 )
-
+FLAT_MODE = True
 slice_list = []
 for i in range(len(mesh_obj_dict)):
     slice_list.append(mesh_obj_dict[i]['original'])
@@ -211,19 +210,36 @@ for i in range(len(mesh_obj_dict)):
 
     #plt.show(mesh_obj_dict[i]['original'], axes=1, interactive=False)
 
-    for slice_index in range(num_of_slices):    
+    for slice_index in range(num_of_slices):  
+        #print(mesh_obj_dict[i]['flat'][slice_index])  
         if slice_index == num_of_slices-1:
-            plt.show(
-                mesh_obj_dict[i]['slice'][slice_index],
-                mesh_obj_dict[i]['cut_plane'][slice_index], 
-                mesh_obj_dict[i]['slice'][slice_index].box().color('g').alpha(0.4), axes=1,
-                title="matplotlib colors", interactive=False)
-        else:
-            plt.show(
+            if FLAT_MODE:
+                plt.show(
+                    mesh_obj_dict[i]['flat'][slice_index],
+                    mesh_obj_dict[i]['cut_plane'][slice_index], 
+                    axes=1,
+                    title="matplotlib colors", interactive=False)
+            else:
+                plt.show(
                     mesh_obj_dict[i]['slice'][slice_index],
                     mesh_obj_dict[i]['cut_plane'][slice_index], 
                     mesh_obj_dict[i]['slice'][slice_index].box().color('g').alpha(0.4),
-                    mesh_obj_dict[i]['slice'][slice_index+1].intersect_with(mesh_obj_dict[i]['cut_plane'][slice_index]).color('p'), axes=1,
+                    axes=1,
+                    title="matplotlib colors", interactive=False)
+        else:
+            if FLAT_MODE:
+                plt.show(
+                    mesh_obj_dict[i]['flat'][slice_index],
+                    mesh_obj_dict[i]['cut_plane'][slice_index], 
+                    axes=1,
+                    title="matplotlib colors", interactive=False)
+            else:
+                plt.show(
+                    mesh_obj_dict[i]['slice'][slice_index],
+                    mesh_obj_dict[i]['cut_plane'][slice_index], 
+                    mesh_obj_dict[i]['slice'][slice_index].box().color('g').alpha(0.4),
+                    mesh_obj_dict[i]['slice'][slice_index+1].intersect_with(mesh_obj_dict[i]['cut_plane'][slice_index]).color('p'), 
+                    axes=1,
                     title="matplotlib colors", interactive=False)
 
 

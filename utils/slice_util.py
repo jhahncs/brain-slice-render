@@ -3,9 +3,60 @@ import os
 from scipy.spatial.transform import Rotation as R
 
 import random
+from vtk.util import numpy_support
 
 import time
 import itertools
+
+def _normalize(_vol):
+    _data = _vol.dataset.GetPoints().GetData()
+    _data_np = numpy_support.vtk_to_numpy(_data)
+    _data_np = _data_np - np.min(_data_np, axis=0)
+    _data_np = _data_np  / np.max(_data_np, axis=0)
+    #return numpy_support.numpy_to_vtk(_data_np)
+    _vol.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
+    #return _vol
+
+
+# assume it has been aligned Y-axis
+def make_boundary_xyz_flat(xyz, num_of_poinst_tickness = 10):    
+
+    max_y = np.max(xyz, axis=0)[1]
+    min_y = np.min(xyz, axis=0)[1]
+    #print('boundary',min_y,max_y)
+    
+    _data_w_max = []
+    for w in xyz:
+        if abs(w[1] - max_y) < 0.01:
+            _data_w_max.append(w)
+
+    _data_w_min = []
+    for w in xyz:
+        if abs(w[1] - min_y) < 0.01:
+            _data_w_min.append(w)
+
+    if len(_data_w_max) > len(_data_w_min):
+        _data_w = np.array(_data_w_max)
+    else:
+        _data_w = np.array(_data_w_min)
+
+
+
+    xyz_list = []
+    tickness = max_y - min_y
+    y_min = min_y
+    for i in range(_data_w.shape[0]):
+        min_value = (tickness/num_of_poinst_tickness)*1 + y_min
+        max_value = (tickness/num_of_poinst_tickness)*num_of_poinst_tickness + y_min
+
+        # 5개의 랜덤한 소수점 숫자 생성
+        random_numbers = [random.uniform(min_value, max_value) for _ in range(5)]
+        for y in random_numbers:
+            xyz_list.append([(_data_w[i][0]), y, _data_w[i][2]])
+
+    xyz_list = np.array(xyz_list)
+    return xyz_list
+
 
 def _read_and_write_v(files, prefix, outfile):
 
