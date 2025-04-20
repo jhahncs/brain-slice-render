@@ -8,6 +8,8 @@ from vtk.util import numpy_support
 import multiprocessing
 from utils import slice_util
 
+
+
 def process_task(_dir_surfix, num_of_slices, vol_index):
     global _vol_norm
     global DEBUG
@@ -87,13 +89,16 @@ def process_task(_dir_surfix, num_of_slices, vol_index):
         _points = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
 
         _points = slice_util.make_boundary_xyz_flat(_points)
-        Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
-        mesh_obj_dict[vol_index]['flat'].append( Points(_points) )
-        _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+        #Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
+        if DEBUG:
+            mesh_obj_dict[vol_index]['flat'].append( Points(_points) )
+        #_vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+
         print(f'{_dir}/piece_{slice_index}.obj')
         #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
         #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
         #slice_list.append(_vol_norm_rotated_slice)
+        slice_util.pcd_2_mesh(f'{_dir}/piece_flat_pcd_{slice_index}.obj',f'{_dir}/piece_flat_pcd_{slice_index}.ply')
 
     if DEBUG:
         return mesh_obj_dict
@@ -138,7 +143,7 @@ if True:
 
 else:
     _vol = Volume('resources/reduced_vol.vti')
-data_home_dir = '/data/jhahn/data/shape_dataset/data/brain'
+data_home_dir = '/data/jhahn/data/shape_dataset/data/brain_block'
 
 #_vol.dataset.GetPoints().SetData(_normalize(_vol.dataset.GetPoints().GetData()))
 
@@ -162,7 +167,7 @@ print('min', np.min(numpy_support.vtk_to_numpy(_vol_norm.dataset.GetPoints().Get
 
 
 
-DEBUG = True
+DEBUG = False
 num_of_slices = 20
 if DEBUG:
     mesh_obj_dict = process_task("output",num_of_slices,0)
@@ -174,15 +179,17 @@ else:
     #for num_of_slices in range(6,15):
 
 
-    for surfix in ['val']:
-        for num_of_slices in [10]:
+    #for surfix, vol_index in [('train',1000),('val',100)]:
+    for surfix, vol_index in [('val',10)]:
+        for num_of_slices in [20]:
             _dir_surfix = f'{data_home_dir}/{num_of_slices}_parts_{surfix}'
             os.makedirs(_dir_surfix, exist_ok=True)
-            for vol_index in range(100):    
+            
+            for _vol_index in range(vol_index):    
             #for vol_index in [0]:
                 dir_surfix_list.append(_dir_surfix)
                 num_of_slices_list.append(num_of_slices)
-                vol_index_list.append(vol_index)
+                vol_index_list.append(_vol_index)
 
         
         
@@ -191,7 +198,7 @@ else:
         pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list))
 
 
-#exit()
+exit()
 
 settings.immediate_rendering = False
 cam = dict(
