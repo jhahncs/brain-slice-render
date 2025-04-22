@@ -37,7 +37,11 @@ def set_logging(level="INFO", path=None):
     """
     logger.remove()
 
-    path = path or str(base_dir / "log.log")
+    import time
+    seconds_since_epoch = time.time()
+    
+    
+    path = path or str(base_dir / f"log{str(seconds_since_epoch)}.log")
     if Path(path).exists():
         Path(path).unlink()
     logger.add(path, level="DEBUG")
