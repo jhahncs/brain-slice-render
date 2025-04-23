@@ -10,7 +10,7 @@ from utils import slice_util
 
 
 
-def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness):
+def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, ply_gen=False):
     global _vol_norm
     global DEBUG
 
@@ -138,7 +138,8 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness):
             #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #slice_list.append(_vol_norm_rotated_slice)
-            slice_util.pcd_2_mesh(f'{_dir}/piece_flat_pcd_{slice_index}.obj',f'{_dir}/piece_flat_pcd_{slice_index}.ply')
+            if ply_gen:
+                slice_util.pcd_2_mesh(f'{_dir}/piece_flat_pcd_{slice_index}.obj',f'{_dir}/piece_flat_pcd_{slice_index}.ply')
 
     if DEBUG:
         return mesh_obj_dict
@@ -219,6 +220,7 @@ else:
     vol_index_list = []
     dir_surfix_list = []
     max_tickness_list = []
+    ply_gen_mode_list = []
     #for num_of_slices in range(6,15):
 
 
@@ -233,6 +235,11 @@ else:
                     num_of_slices_list.append(num_of_slices)
                     vol_index_list.append(vol_index)
                     max_tickness_list.append(max_tickness)
+                    if surfix == 'val' and vol_index == 0:
+                        ply_gen_mode_list.append(True)
+                    else:
+                        ply_gen_mode_list.append(False)
+
                     
                 #for _vol_index in range(vol_index):    
                 #for vol_index in [0]:
@@ -241,7 +248,7 @@ else:
         
     print(f'the number of jobs:{len(dir_surfix_list)}')
     with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
-        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list, max_tickness_list))
+        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list, max_tickness_list,ply_gen_mode_list))
 
 
 exit()
