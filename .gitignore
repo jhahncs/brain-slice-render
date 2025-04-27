@@ -3,6 +3,7 @@
 examples/*.mp4
 tests/*.mp4
 *.xlsx
+*.vti
 *.csv
 web/static
 .pytest_cache

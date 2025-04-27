@@ -26,15 +26,16 @@ def make_boundary_xyz_flat(xyz, num_of_poinst_tickness = 10):
     max_y = np.max(xyz, axis=0)[1]
     min_y = np.min(xyz, axis=0)[1]
     #print('boundary',min_y,max_y)
-    
+    #print(max_y, min_y)
+    #print(len(xyz))
     _data_w_max = []
     for w in xyz:
-        if abs(w[1] - max_y) < 0.01:
+        if abs(w[1] - max_y) <= 1:
             _data_w_max.append(w)
 
     _data_w_min = []
     for w in xyz:
-        if abs(w[1] - min_y) < 0.01:
+        if abs(w[1] - min_y) <= 1:
             _data_w_min.append(w)
 
     if len(_data_w_max) > len(_data_w_min):
@@ -42,7 +43,8 @@ def make_boundary_xyz_flat(xyz, num_of_poinst_tickness = 10):
     else:
         _data_w = np.array(_data_w_min)
 
-
+    print("flat",len(_data_w))
+    #print(_data_w)
 
     xyz_list = []
     tickness = max_y - min_y
@@ -57,6 +59,7 @@ def make_boundary_xyz_flat(xyz, num_of_poinst_tickness = 10):
             xyz_list.append([(_data_w[i][0]), y, _data_w[i][2]])
 
     xyz_list = np.array(xyz_list)
+    #xyz_list = _data_w
     return xyz_list
 
 def pcd_2_mesh(pdc_filename, mesh_filename):
