@@ -65,7 +65,7 @@ def make_boundary_xyz_flat(xyz, num_of_poinst_tickness = 10):
 def pcd_2_mesh(pdc_filename, mesh_filename):
     mesh = Mesh(pdc_filename)
     pts0 = Points(mesh, r=3).add_gaussian_noise(1)
-    pts1 = pts0.clone().smooth_mls_2d(f=0.2)
+    pts1 = pts0.clone().smooth_mls_2d(f=2)
     pts1.subsample(0.005)
     reco = pts1.reconstruct_surface(dims=100, radius=0.2)
     reco.write(mesh_filename)

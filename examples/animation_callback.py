@@ -36,4 +36,4 @@ anim = Animation(
 anim.add_keyframe(0, camera="frontal", zoom=1, callback=slc)
 
 # Make videos
-#anim.make_video(duration=5, fps=10, fix_camera=True)
+anim.make_video(duration=5, fps=10, fix_camera=True)

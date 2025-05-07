@@ -166,21 +166,23 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smal
             mesh_obj_dict[vol_index]['slice'].append(_vol_norm_rotated_slice)
             mesh_obj_dict[vol_index]['slice_original'].append(_vol_norm_rotated_slice_original.clone())
         
-        _points = get_flat_pcd(_vol_norm_rotated_slice)
+        #_points = get_flat_pcd(_vol_norm_rotated_slice)
         
         
         if DEBUG:
-            print('tickness',abs(np.max(_points, axis=0)[1]-np.min(_points, axis=0)[1]))   
-            mesh_obj_dict[vol_index]['flat'].append( Points(_points).color(_color, slice_color_alpha) )
+            pass
+            #print('tickness',abs(np.max(_points, axis=0)[1]-np.min(_points, axis=0)[1]))   
+            #mesh_obj_dict[vol_index]['flat'].append( Points(_points).color(_color, slice_color_alpha) )
         else:
             _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
-            Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
+            #Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
             
             #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #slice_list.append(_vol_norm_rotated_slice)
             if ply_gen:
-                slice_util.pcd_2_mesh(f'{_dir}/piece_flat_pcd_{slice_index}.obj',f'{_dir}/piece_flat_pcd_{slice_index}.ply')
+                print(f'{_dir}/piece_{slice_index}.ply')
+                slice_util.pcd_2_mesh(f'{_dir}/piece_{slice_index}.obj',f'{_dir}/piece_{slice_index}.ply')
 
     if DEBUG:
         return mesh_obj_dict
@@ -228,7 +230,7 @@ if True:
 
 else:
     _vol = Volume('resources/reduced_vol.vti')
-data_home_dir = '/data/jhahn/data/shape_dataset/data/brain_block'
+data_home_dir = '/data/jhahn/data/shape_dataset/data/mouse_brain_50mm'
 num_of_slices = 20
 max_slice_tickness = 50
 max_rotation_x_angle = 20
@@ -295,7 +297,7 @@ _vol_norm.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_data_np))
 
 
 
-DEBUG = True
+DEBUG = False
 
 
 
@@ -308,11 +310,14 @@ else:
     dir_surfix_list = []
     max_tickness_list = []
     ply_gen_mode_list = []
+    smallest_tickness_list = []
+    max_rotation_x_angle_list = []
     #for num_of_slices in range(6,15):
 
 
     #for surfix, vol_index in [('train',1000),('val',100)]:
-    for surfix, num_of_samples, ply_gen_mod in [('train',1000, False),('val',100, False),('test',100, False)]:
+    #for surfix, num_of_samples, ply_gen_mod in [('train',1000, False),('val',100, False),('test',100, True)]:
+    for surfix, num_of_samples, ply_gen_mod in [('test',10, True)]:
         for max_tickness in [50]:
             for num_of_slices in [20]:
                 _dir_surfix = f'{data_home_dir}/{max_tickness}_tickness_{num_of_slices}_sllices_{surfix}'
@@ -322,20 +327,22 @@ else:
                     num_of_slices_list.append(num_of_slices)
                     vol_index_list.append(vol_index)
                     max_tickness_list.append(max_tickness)
+                    smallest_tickness_list.append(1)
+                    max_rotation_x_angle_list.append(20)
                     ply_gen_mode_list.append(ply_gen_mod)
 
                     
                 #for _vol_index in range(vol_index):    
                 #for vol_index in [0]:
 
-        
+
         
     print(f'the number of jobs:{len(dir_surfix_list)}')
     with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
-        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list, max_tickness_list,ply_gen_mode_list))
+        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list, max_tickness_list,smallest_tickness_list,max_rotation_x_angle_list,ply_gen_mode_list))
 
 
-#exit()
+exit()
 
 settings.immediate_rendering = False
 cam = dict(

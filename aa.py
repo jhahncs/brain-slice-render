@@ -1,19 +1,39 @@
+from brainrender import Animation, Scene, settings
 from pathlib import Path
 
-from myterial import orange
-from rich import print
+settings.SHOW_AXES = False
 
-from brainrender import Scene
+scene = Scene(atlas_name="allen_mouse_25um")
+
+regions = (
+    "CTX",
+    "HPF",
+    "STR",
+    "CB",
+    "MB",
+    "TH",
+    "HY",
+)
+scene.add_brain_region(*regions, silhouette=True)
 
 
-# Create a brainrender scene
-scene = Scene(title="brain regions", atlas_name="allen_mouse_50um")
+def slc(scene, framen, totframes):
+    # Get new slicing plane
+    fact = framen / totframes
+    shape_um = scene.atlas.shape_um
+    # Multiply by fact to move the plane, add buffer to go past the brain
+    point = [(shape_um[0] + 500) * fact, shape_um[1] // 2, shape_um[2] // 2]
+    plane = scene.atlas.get_plane(pos=point, norm=(1, 0, 0))
 
-# Add brain regions
-scene.add_brain_region("HIP")
-print(scene.get_actors()[0])
-print(scene.get_actors()[1])
-# You can specify color, transparency...
+    scene.slice(plane)
 
-# Render!
-scene.render()
+
+anim = Animation(
+    scene, Path.cwd(), "brainrender_animation_callback", size=None
+)
+
+# Specify camera pos and zoom at some key frames`
+anim.add_keyframe(0, camera="frontal", zoom=1, callback=slc)
+
+# Make videos
+anim.make_video(duration=5, fps=10, fix_camera=True)

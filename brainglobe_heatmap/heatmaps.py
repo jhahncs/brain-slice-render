@@ -203,7 +203,9 @@ class Heatmap:
             for r in self.scene.get_actors(br_class="brain region")
             if r.name != "root"
         ]
-
+        #print(type(self.regions_meshes[0]),self.regions_meshes[0])
+        #for _a in self.regions_meshes:
+        #    _a.mesh.linewidth(0)
         # prepare slicer object
         self.slicer = Slicer(position, orientation, thickness, self.scene.root)
 
@@ -497,10 +499,11 @@ class Heatmap:
                 coords[:, 1],
                 color=self.colors[name],
                 label=name if segment_nr == "0" and name != "root" else None,
-                lw=1,
+                #lw=1, # jhahn
+                lw=0,
                 ec="k",
                 zorder=-1 if name == "root" else None,
-                alpha=0.3 if name == "root" else None,
+                alpha=0.1 if name == "root" else None, # 0.3
             )
 
             display_text = self.get_region_annotation_text(name)
