@@ -2,6 +2,7 @@
 .DS_Store
 examples/*.mp4
 tests/*.mp4
+logs
 *.xlsx
 *.vti
 *.npy
