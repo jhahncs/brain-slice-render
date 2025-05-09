@@ -6,7 +6,8 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 import itertools
-
+from openpyxl import Workbook
+from openpyxl import load_workbook
 
 import logging
 import os
@@ -48,21 +49,32 @@ logger.addHandler(fileHandler)
 
 
 class Cfos():
-    def __init__(self, filename_exp,  filename_veh, output_dir='output'):
+    def __init__(self, filename, output_dir='output'):
 
         self.output_dir = output_dir
         self.color_list = ['PV','cfos','SST']
         self.prefix_to_remove_column = ['Unnamed',"average","VEH","EXP","mean","sem","%error",'Analyses']
         logger.info(f'preprocessing:')
 
-        self.df_exp = pd.read_csv(filename_exp)
-        self.df_veh = pd.read_csv(filename_veh)
-        logger.info(f"EXP: {len(self.df_exp)} samples")
-        logger.info(f"VEH: {len(self.df_veh)} samples")
+        #filename = 'resources/SST_PV_cfos_Summary_Jin_Mehdi_March25 (1).xlsx'
+        wb = load_workbook(filename)
+
+
+        for sheet in wb.worksheets:
+            if 'VEH' in sheet.title:        
+                self.df_exp = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
+            elif 'EXP' in sheet.title:
+                self.df_veh = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
+        #sheets['VEH']
+        #self.df_exp = pd.read_csv(filename_exp)
+        #self.df_veh = pd.read_csv(filename_veh)
+        wb.close()
 
 
         self.df_exp = self._proprocess(self.df_exp)
         self.df_veh = self._proprocess(self.df_veh)
+        logger.info(f"EXP: {len(self.df_exp)} samples")
+        logger.info(f"VEH: {len(self.df_veh)} samples")
 
         logger.info(self.df_exp.columns[:5])
         logger.info(self.df_exp.columns[-5:])
@@ -96,6 +108,10 @@ class Cfos():
 
 
         #df_exp.head()
+    def verify(self):
+        
+        return [c for c in _df.columns if len(c.split("_")) == 3 and c.split("_")[2] in _color_list]
+
     def _get_columns_color(self, _df, _color_list):
         return [c for c in _df.columns if len(c.split("_")) == 3 and c.split("_")[2] in _color_list]
 
