@@ -20,9 +20,14 @@
 				//form_data.append('prompt', prompt);
 				//form_data.append('file', image);
 		
+
+				var fileInput = $('#file-input')[0].files[0];
+				var formData = new FormData();
+				formData.append('file', fileInput);
+
 				const input_file = document.querySelector('#MyForm');
   // const input_file = $('#file_form')[0];  // jQuery 사용시에는 이렇게 [0]을 붙어줘야한다.
-				let data = new FormData(input_file);
+				//let data = new FormData(input_file);
 				$("#answer").html("inferencing...")
 				$("#elapsed_time_sec").html("")
 				$("#mem_GB").html("")
@@ -33,7 +38,7 @@
 					processData: false,
 					cache: false,
 					contentType: false,
-                    data: data, // Serialize form data
+                    data: formData, // Serialize form data
                     success: function (data) {
 						console.log(data)
                         //alert("Form Submitted Successfully");
@@ -81,7 +86,7 @@
 				<tr>
 					<td colspan=2>
 						<img id="selected_img"  src="#" alt="a selected image will be displayed here" /><br>
-						<input id="fileupload" type="file"  name="file"  onchange="readURL(this);" multiple />
+						<input id="file-input" type="file"  name="file"  onchange="readURL(this);" >
 						
 					</td>
 				</tr>
