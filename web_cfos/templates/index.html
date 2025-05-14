@@ -1,0 +1,108 @@
+<html>
+    <head>
+		<script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+
+		
+		<script type="text/javascript">
+        $(document).ready(function () {
+            $("#submitButton").click(function (event) {
+                event.preventDefault(); // Prevent default form submission
+				$('html, body').css("cursor", "wait");
+				//let person = {name:"abc", age:10};
+                //let form = $("#MyForm");
+				//console.log($('#selected_img'))
+				
+				//var prompt = $('#prompt').val();
+				//var image = new FormData($('#fileupload'));
+				//var image = new FormData($('#FileForm')[0]);
+				//alert(image)
+				//var form_data = new FormData();
+				//form_data.append('prompt', prompt);
+				//form_data.append('file', image);
+		
+				const input_file = document.querySelector('#MyForm');
+  // const input_file = $('#file_form')[0];  // jQuery 사용시에는 이렇게 [0]을 붙어줘야한다.
+				let data = new FormData(input_file);
+				$("#answer").html("inferencing...")
+				$("#elapsed_time_sec").html("")
+				$("#mem_GB").html("")
+				
+                $.ajax({
+                    type: "POST",
+                    url: '/gemma',
+					processData: false,
+					cache: false,
+					contentType: false,
+                    data: data, // Serialize form data
+                    success: function (data) {
+						console.log(data)
+                        //alert("Form Submitted Successfully");
+                        $("#answer").html(data['answer'])
+						$("#elapsed_time_sec").html(data['elapsed_time_sec'])
+						$("#mem_GB").html(data['mem_GB'])
+						$('html, body').css("cursor", "default");
+                    },
+                    error: function (data) {
+						console.log(data)
+                        alert("Error occurred while submitting the form");
+                    }
+                });
+				//alert("the request is sent")
+            });
+        });
+
+		function readURL(input) {
+			if (input.files && input.files[0]) {
+
+					var reader = new FileReader();
+
+					reader.onload = function (e) {
+						$('#selected_img').attr('src', e.target.result);
+					};
+					//alert(input.files[0].name)
+					reader.readAsDataURL(input.files[0]);
+				
+
+			}
+		}
+		
+		</script>
+	
+    </head>
+    <body>
+	
+	
+	
+        <form id='MyForm' method='POST'  enctype="multipart/form-data">
+            <table width="800">  
+                <tr valign='middle' width="100%">
+                    <td >Prompt:<textarea id='prompt' name='prompt' rows=4 cols=70>Count the number of red cells in this image and tell me their coordinates.</textarea></td><td><button type="submit"  id="submitButton"> Submit</button></td>
+                </tr>
+				<tr>
+					<td colspan=2>
+						<img id="selected_img"  src="#" alt="a selected image will be displayed here" /><br>
+						<input id="fileupload" type="file"  name="file"  onchange="readURL(this);" multiple />
+						
+					</td>
+				</tr>
+                <tr width="100%">
+                    <td></td>
+                </tr>                
+            </table>            
+			
+			
+        </form>
+		
+				
+		<h4>Image to Text mode <a href='https://huggingface.co/google/gemma-3-4b-it' target='_blank'>gemma-3-4b-it</a> (if you select an image)</h4>
+		<i>&nbsp;&nbsp;&nbsp;&nbsp;<b>TIFF</b> images also work even if they are not displayed in this page</i> <br>
+		<h4>Text generation mode <a href='https://huggingface.co/google/gemma-3-1b-pt' target='_blank'>gemma-3-1b-pt</a> (if you do NOT select an image)</h4>
+		
+
+		<br>
+		<i>The inference usually takes about 20 seconds. </i>
+		<hr>
+		Answer (it took <div id='elapsed_time_sec'  style="display: inline-block;">OO</div> sec. and consumed <div id='mem_GB'  style="display: inline-block;"> OO</div> GB GPU memory) : <b><div id='answer'></div></b>
+    </body>
+    
+</html>
