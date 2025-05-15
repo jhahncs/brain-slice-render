@@ -40,7 +40,11 @@ fileHandler.suffix = "-%Y%m%d"
 
 fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
+color_list = ['PV','cfos','SST']
 
+
+def _get_columns_color(self, _df, _color_list):
+    return [c for c in _df.columns if len(c.split("_")) == 3 and c.split("_")[2] in _color_list]
 
 def mystatistic(x, y):
   return np.mean(x, axis=0) - np.mean(y, axis=0)
@@ -54,7 +58,7 @@ def _stat_test(_df_agg, _color, p_or_t):
     group_veh = _df[_df['veh_exp'] == 1][_df.columns[3:]]
     pvalues = None
     if p_or_t == 'permutation_test':
-      res = stats.permutation_test((group_exp, group_veh), mystatistic, random_state = None)
+      res = stats.permutation_test((group_exp, group_veh), mystatistic, n_resamples= 1000,random_state = None)
       pvalues = res.pvalue
     elif p_or_t == 't_test':
       t_stat, pvalues = stats.ttest_ind(group_exp, group_veh)
@@ -74,34 +78,40 @@ def _stat_test(_df_agg, _color, p_or_t):
 
   
 
-def cal_pvalue(_df_agg, test_method, region_id_2_tg_id, region_id_2_name, result_filename_permutation='output/pvalue_permutation.csv'):
+def cal_pvalue(cfos,_df_agg, test_method, result_filename_permutation='output/pvalue_permutation.csv'):
+
+    region_id_2_tg_id = cfos.region_id_2_tg_id
+    region_id_2_name = cfos.region_id_2_name
 
 
-    if os.path.exists(result_filename_permutation):
-        _df_pvalue_permutation_test = pd.read_csv(result_filename_permutation)
-        _df_pvalue_permutation_test = _df_pvalue_permutation_test.reset_index(drop=True)
-        #_df_pvalue_permutation_test.rename(columns={'Unnamed: 0': 'Region ID'}, inplace=True)
-        _df_pvalue_permutation_test['Region ID'] = _df_pvalue_permutation_test['Region ID'].astype(str)
-        return _df_pvalue_permutation_test
-    df_list = []
-    color_code_list = []
-    p_t_list = []
-    for _color in list(set(_df_agg['color'].values)):
-        df_list.append(_df_agg)
-        color_code_list.append(_color)
-        p_t_list.append(test_method)
+    if not os.path.exists(result_filename_permutation):
+        df_list = []
+        color_code_list = []
+        p_t_list = []
+        for _color in list(set(_df_agg['color'].values)):
+            df_list.append(_df_agg)
+            color_code_list.append(_color)
+            p_t_list.append(test_method)
 
-    logger.info(f'the number of jobs:{len(color_code_list)}')
-    with multiprocessing.Pool() as pool: # Use a pool of 4 processes
-        results = pool.starmap(_stat_test, zip(df_list, color_code_list, p_t_list))
-    df_pvalue = pd.concat(results)
+        logger.info(f'the number of jobs:{len(color_code_list)}')
+        with multiprocessing.Pool() as pool: # Use a pool of 4 processes
+            results = pool.starmap(_stat_test, zip(df_list, color_code_list, p_t_list))
+        df_pvalue = pd.concat(results)
 
-    df_pvalue = _transpose(df_pvalue,  region_id_2_tg_id, region_id_2_name)
-    df_pvalue.to_csv(result_filename_permutation, index=None)
-    logger.info(f'saved:{result_filename_permutation}')
+        df_pvalue = _transpose(df_pvalue,  region_id_2_tg_id, region_id_2_name)
+        df_pvalue = df_pvalue.reset_index(drop=True)
+        df_pvalue.index.name = None
+        df_pvalue.to_csv(result_filename_permutation, index=None)
+        logger.info(f'saved:{result_filename_permutation}')
 
 
-    return df_pvalue
+    _df_pvalue_permutation_test = pd.read_csv(result_filename_permutation)
+    _df_pvalue_permutation_test = _df_pvalue_permutation_test.reset_index(drop=True)
+    #_df_pvalue_permutation_test.rename(columns={'Unnamed: 0': 'Region ID'}, inplace=True)
+    _df_pvalue_permutation_test['Region ID'] = _df_pvalue_permutation_test['Region ID'].astype(str)
+    return _df_pvalue_permutation_test
+
+
 
 def _transpose(_df,  region_id_2_tg_id, region_id_2_name):   
     '''
@@ -151,104 +161,120 @@ def _cal_fdr(_row, columns, _alpha = 0.05):
   return _df
 
 
-def cal_fdr(_df_pvalue,  region_id_2_tg_id, region_id_2_name,_alpha = 0.05, result_filename='output/pvalue_permutation_fdr.csv'):
+def cal_fdr(cfos,_df_pvalue,  _alpha = 0.05, result_filename='output/pvalue_permutation_fdr.csv'):
+
+    region_id_2_tg_id = cfos.region_id_2_tg_id
+    region_id_2_name = cfos.region_id_2_name
+
+    if not os.path.exists(result_filename):
+        
+
+        color_columns = [c for c in _df_pvalue.columns if c not in ['TG number','Region Name','Region ID']]
+
+        row_list = []
+        columns_list = []
+        _alpha_list = []
+        for _i, _row in _df_pvalue.iterrows():
+            row_list.append(_row)
+            columns_list.append(color_columns)
+            _alpha_list.append(0.05)
+
+        logger.info(f'the number of jobs:{len(row_list)}')
+        with multiprocessing.Pool() as pool: # Use a pool of 4 processes
+            results = pool.starmap(_cal_fdr, zip(row_list, columns_list, _alpha_list))
+        df_pvalue_fdr = pd.concat(results)
+        #final_df.to_csv(result_filename, index=None)
+
+        df_pvalue_fdr = df_pvalue_fdr.set_index('Region ID')
+        df_pvalue_fdr['TG number'] = df_pvalue_fdr.index.map(region_id_2_tg_id)
+        df_pvalue_fdr['Region Name'] = df_pvalue_fdr.index.map(region_id_2_name)
+        #print(df_pvalue_fdr.columns)
+        #print(df_pvalue_fdr.index)
+        #print(df_pvalue_fdr)
+        df_pvalue_fdr = df_pvalue_fdr.reset_index()
+        #print(df_pvalue_fdr)
+        df_pvalue_fdr = df_pvalue_fdr[['TG number','Region ID','Region Name'] + color_columns]
+        #df_pvalue_fdr.index =None
+        df_pvalue_fdr.to_csv(result_filename, index=None)
+        logger.info(f'saved:{result_filename}')
+        '''
+        #_df_pvalue_permutation_test.set_index("color", inplace=True)
+        df_pvalue_fdr.index.name = 'Region ID'
+        #_df_pvalue_permutation_test = _df_pvalue_permutation_test.T
 
 
-    if os.path.exists(result_filename):
-        final_df = pd.read_csv(result_filename)
-        final_df = final_df.reset_index(drop=True)
-        final_df['Region ID'] = final_df['Region ID'].astype(str)
-        return final_df
+        '''
 
-    color_columns = [c for c in _df_pvalue.columns if c not in ['TG number','Region Name','Region ID']]
-
-    row_list = []
-    columns_list = []
-    _alpha_list = []
-    for _i, _row in _df_pvalue.iterrows():
-        row_list.append(_row)
-        columns_list.append(color_columns)
-        _alpha_list.append(0.05)
-
-    logger.info(f'the number of jobs:{len(row_list)}')
-    with multiprocessing.Pool() as pool: # Use a pool of 4 processes
-        results = pool.starmap(_cal_fdr, zip(row_list, columns_list, _alpha_list))
-    df_pvalue_fdr = pd.concat(results)
-    #final_df.to_csv(result_filename, index=None)
-
-    df_pvalue_fdr = df_pvalue_fdr.set_index('Region ID')
-    df_pvalue_fdr['TG number'] = df_pvalue_fdr.index.map(region_id_2_tg_id)
-    df_pvalue_fdr['Region Name'] = df_pvalue_fdr.index.map(region_id_2_name)
-    #print(df_pvalue_fdr.columns)
-    #print(df_pvalue_fdr.index)
-    #print(df_pvalue_fdr)
-    df_pvalue_fdr = df_pvalue_fdr.reset_index()
-    #print(df_pvalue_fdr)
-    df_pvalue_fdr = df_pvalue_fdr[['TG number','Region ID','Region Name'] + color_columns]
-    #df_pvalue_fdr.index =None
-    df_pvalue_fdr.to_csv(result_filename, index=None)
-    logger.info(f'saved:{result_filename}')
-    '''
-    #_df_pvalue_permutation_test.set_index("color", inplace=True)
-    df_pvalue_fdr.index.name = 'Region ID'
-    #_df_pvalue_permutation_test = _df_pvalue_permutation_test.T
-
-
-    '''
-    return df_pvalue_fdr
+    final_df = pd.read_csv(result_filename)
+    final_df = final_df.reset_index(drop=True)
+    final_df['Region ID'] = final_df['Region ID'].astype(str)
+    return final_df
+    
+    return final_df
 
 def cal_fold(cfos, df_mean_cor_sag, result_filename="output/fold.csv"):
+    
+    if not os.path.exists(result_filename):
+        logger.info("cal fold")
+        _df_list = []
+        _df_columns = []
+        for _color in list(set(df_mean_cor_sag['color'].values)):
+            #for _cut_method in ['cor','sag']:
+
+            _df_total_veh = df_mean_cor_sag.query(f'color=="{_color}" and veh_exp == 0 ').drop(['veh_exp','color','sample_id'],axis=1).copy()
+            _df_total_exp = df_mean_cor_sag.query(f'color=="{_color}" and veh_exp == 1 ').drop(['veh_exp','color','sample_id'],axis=1).copy()
+                
+            #_df_fold_temp = _df_total_exp.mean(axis=0) / _df_total_veh.mean(axis=0)
+            _df_total_exp_veh = pd.concat([_df_total_exp.mean(axis=0), _df_total_veh.mean(axis=0)], axis=1)
+            _row_list = []
+            for _i, _row in _df_total_exp_veh.iterrows():
+                _row_new = {}
+
+                #_row_new['TG number'] = region_id_2_tg_id[_i]
+                _row_new['Region ID'] = _i
+                #_row_new['Region Name'] = region_id_2_name[_i]
+                #print(_i, _row)
+                #if _row[1] == 0:
+                #    print(_row)
+                if _row[0] < _row[1]:
+                    if _row[1] == 0:
+                        _row_new['fold'] = 0
+                    else:
+                        _row_new['fold'] = _row[0] / _row[1]
+                else:
+                    if _row[1] == 0:
+                        _row_new['fold'] = 0
+                    else:
+                        _row_new['fold'] = _row[0] / _row[1]
+                _row_list.append(_row_new)
+            _df_fold_temp = pd.DataFrame(_row_list)
+            _df_fold_temp['Region ID'] = _df_fold_temp['Region ID'].astype(str)
+            #print(_df_fold_temp)
+            _df_fold_temp.set_index('Region ID', inplace=True)
+            #_df_fold_temp
+
+            _df_list.append(_df_fold_temp)
+            _df_columns.append(f'{_color}')
+        _df_fold = pd.concat(_df_list, axis=1)
         
-    
+        _df_fold.columns = _df_columns
+        #_df_fold['Region ID'] = _df_fold['Region ID'].astype(str)
+        _df_fold.index = _df_fold.index.astype(str)
+        #_df_fold = _df_fold.rename(index=cfos.tg_num_2_name)
+        #_df_fold = np.log(_df_fold)
+        _df_fold = _df_fold.replace(np.nan, 0)
+        _df_fold = _df_fold.replace(np.inf, 0)
+        _df_fold['TG number'] = _df_fold.index.map(cfos.region_id_2_tg_id)
+        _df_fold['Region Name'] = _df_fold.index.map(cfos.region_id_2_name)
+        _df_fold = _df_fold[['TG number','Region Name'] + list(_df_fold.columns[:11])]
+        #_df_fold.set_index('TG number', inplace=True)
+        
+        logger.info("cal fold saved into:"+result_filename)
+        _df_fold.to_csv(result_filename)
 
-    _df_list = []
-    _df_columns = []
-    for _color in list(set(df_mean_cor_sag['color'].values)):
-        #for _cut_method in ['cor','sag']:
-
-        _df_total_veh = df_mean_cor_sag.query(f'color=="{_color}" and veh_exp == 0 ').drop(['veh_exp','color','sample_id'],axis=1).copy()
-        _df_total_exp = df_mean_cor_sag.query(f'color=="{_color}" and veh_exp == 1 ').drop(['veh_exp','color','sample_id'],axis=1).copy()
-            
-        #_df_fold_temp = _df_total_exp.mean(axis=0) / _df_total_veh.mean(axis=0)
-        _df_total_exp_veh = pd.concat([_df_total_exp.mean(axis=0), _df_total_veh.mean(axis=0)], axis=1)
-        _row_list = []
-        for _i, _row in _df_total_exp_veh.iterrows():
-            _row_new = {}
-
-            #_row_new['TG number'] = region_id_2_tg_id[_i]
-            _row_new['Region ID'] = _i
-            #_row_new['Region Name'] = region_id_2_name[_i]
-            #print(_i, _row)
-            #if _row[1] == 0:
-            #    print(_row)
-            if _row[0] < _row[1]:
-                if _row[1] == 0:
-                    _row_new['fold'] = 0
-                else:
-                    _row_new['fold'] = _row[0] / _row[1]
-            else:
-                if _row[1] == 0:
-                    _row_new['fold'] = 0
-                else:
-                    _row_new['fold'] = _row[0] / _row[1]
-            _row_list.append(_row_new)
-        _df_fold_temp = pd.DataFrame(_row_list)
-        _df_fold_temp.set_index('Region ID', inplace=True)
-        #_df_fold_temp
-
-        _df_list.append(_df_fold_temp)
-        _df_columns.append(f'{_color}')
-    _df_fold = pd.concat(_df_list, axis=1)
-    _df_fold.columns = _df_columns
-    _df_fold = _df_fold.rename(index=cfos.tg_num_2_name)
-    #_df_fold = np.log(_df_fold)
-    _df_fold = _df_fold.replace(np.nan, 0)
-    _df_fold = _df_fold.replace(np.inf, 0)
-    _df_fold['TG number'] = _df_fold.index.map(cfos.region_id_2_tg_id)
-    _df_fold['Region Name'] = _df_fold.index.map(cfos.region_id_2_name)
-    _df_fold = _df_fold[['TG number','Region Name'] + list(_df_fold.columns[:11])]
-    #_df_fold.set_index('TG number', inplace=True)
-    
-
-    _df_fold.to_csv(result_filename)
+    _df_fold = pd.read_csv(result_filename)
+    logger.info("cal fold loaded from:"+result_filename)
+    _df_fold['TG number'] = _df_fold['TG number'].astype(str)
+    _df_fold['Region ID'] = _df_fold['Region ID'].astype(str)
+    _df_fold.set_index("Region ID", inplace=True)
     return  _df_fold

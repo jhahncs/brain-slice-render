@@ -64,11 +64,8 @@ class Cfos():
         filename_df_exp_veh = output_dir+"/df_exp_veh.csv"
         
 
-        if load_from_files:
-            self.df_exp = pd.read_csv(filename_df_exp)
-            
-            self.df_veh = pd.read_csv(filename_df_veh)
-        else:
+
+        if not load_from_files:
             logger.info(f'loading: {filename}')
             #filename = 'resources/SST_PV_cfos_Summary_Jin_Mehdi_March25 (1).xlsx'
             wb = load_workbook(filename)
@@ -88,6 +85,13 @@ class Cfos():
 
             logger.info(f"saved into:{filename_df_veh}")
             self.df_veh.to_csv(filename_df_veh, index=None)
+
+
+        self.df_exp = pd.read_csv(filename_df_exp)
+        self._int_2_str(self.df_exp)
+                    
+        self.df_veh = pd.read_csv(filename_df_veh)
+        self._int_2_str(self.df_veh)
 
         logger.info(f"EXP: {len(self.df_exp)} samples")
         logger.info(f"VEH: {len(self.df_veh)} samples")
@@ -117,10 +121,13 @@ class Cfos():
             self.df_exp_veh.set_index('TG number', inplace=True)
             logger.info(f'saved (exp and veh) into : {filename_df_exp_veh}')
             self.df_exp_veh.to_csv(filename_df_exp_veh)
-        else:
-            logger.info(f'loaded (exp and veh) from : {filename_df_exp_veh}')
-            self.df_exp_veh = pd.read_csv(filename_df_exp_veh)
-            self.df_exp_veh.set_index('TG number', inplace=True)
+
+
+
+        logger.info(f'loaded (exp and veh) from : {filename_df_exp_veh}')
+        self.df_exp_veh = pd.read_csv(filename_df_exp_veh)
+        self._int_2_str(self.df_exp_veh)
+        self.df_exp_veh.set_index('TG number', inplace=True)
         
         
         
@@ -132,6 +139,12 @@ class Cfos():
 
         logger.info("cfos init done")
         #df_exp.head()
+    def _int_2_str(self, _df):
+        if 'Region ID' in _df.columns:
+            _df['Region ID'] = _df['Region ID'].astype(str)    
+        if 'TG number' in _df.columns:
+            _df['TG number'] = _df['TG number'].astype(str)    
+        
     def preprocess_summary(self):
         summary = ''
         summary += f'EXP: {self.subject_id_exp}\n'
@@ -248,43 +261,37 @@ class Cfos():
 
         
 
-        if load_from_files:
-            self.df_mean_cor_sag = pd.read_csv(filename)
-            logger.info(f'loaded agg data: {filename}')
-            return
-        logger.info(f'creating agg data...')
-        _df_total = self.df_total
-        print(_df_total.index)
-        print(_df_total.columns)
-        print(_df_total)
-        df_mean_cor_sag = _df_total.groupby(['sample_id', 'color','veh_exp'], as_index=False)[_df_total.columns[:-4]].agg('mean')
-        df_mean_cor_sag.index.name = None
-        df_mean_cor_sag.to_csv(filename, encoding='utf-8', index=None)
-        logger.info(f'agg data saved into {filename}')
-
-        self.df_mean_cor_sag = df_mean_cor_sag
-
+        if not load_from_files:
+            logger.info(f'creating agg data...')
+            _df_total = self.df_total
+            #print(_df_total.index)
+            #print(_df_total.columns)
+            #print(_df_total)
+            df_mean_cor_sag = _df_total.groupby(['sample_id', 'color','veh_exp'], as_index=False)[_df_total.columns[:-4]].agg('mean')
+            df_mean_cor_sag.index.name = None
+            df_mean_cor_sag.to_csv(filename, encoding='utf-8', index=None)
+            logger.info(f'agg data saved into {filename}')
+            
+        self.df_mean_cor_sag = pd.read_csv(filename)
+        logger.info(f'loaded agg data: {filename}')
 
     def get_raw_df(self, raw_file_name='df_raw.csv', load_from_files = False):
 
-        if load_from_files:
-            self.df_total = pd.read_csv(raw_file_name)
-            self.df_total.set_index('Unnamed: 0',inplace=True)
-            return
+        if not load_from_files:           
             
-        df_total = pd.concat([self.df_exp.drop(['TG number','Region ID','Region name'] ,axis=1),self.df_veh.drop(['TG number','Region name'] ,axis=1)], axis=1)
-        #df_total.set_index('TG number', inplace=True)
-        df_total.set_index('Region ID', inplace=True)
-        df_total = df_total.T
-        df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
-        df_total['veh_exp'] = [1 if a.split('_')[0] in self.subject_id_exp else 0 for a in df_total.index]
-        df_total['cut_method'] = ['cor' if a.split('_')[1] == 'cor' else 'sag' for a in df_total.index]
-        df_total['color'] =[ a.split('_')[2] for a in df_total.index]
-        df_total.to_csv(raw_file_name)
-        logger.info(f'Raw data saved into {raw_file_name}')
+            df_total = pd.concat([self.df_exp.drop(['TG number','Region ID','Region name'] ,axis=1),self.df_veh.drop(['TG number','Region name'] ,axis=1)], axis=1)
+            #df_total.set_index('TG number', inplace=True)
+            df_total.set_index('Region ID', inplace=True)
+            df_total = df_total.T
+            df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
+            df_total['veh_exp'] = [1 if a.split('_')[0] in self.subject_id_exp else 0 for a in df_total.index]
+            df_total['cut_method'] = ['cor' if a.split('_')[1] == 'cor' else 'sag' for a in df_total.index]
+            df_total['color'] =[ a.split('_')[2] for a in df_total.index]
+            df_total.to_csv(raw_file_name)
+            logger.info(f'Raw data saved into {raw_file_name}')
 
-        self.df_total = df_total
-
+        self.df_total = pd.read_csv(raw_file_name)
+        self.df_total.set_index('Unnamed: 0',inplace=True)
 
     def _proprocess(self, _df):
         for prefix in self.prefix_to_remove_column:
@@ -292,7 +299,8 @@ class Cfos():
         #df_exp = df_exp.drop([a for a in df_exp.columns if a.endswith("fraction")], axis=1)
         _df.drop(_df[pd.isnull(_df['Region name'])].index, inplace=True)
         _df['Region ID'] = _df['Region ID'].astype(str)    
-        #_df['Region ID'] = _df['Region ID'].str[:-2]
+        if '.' in str(_df['Region ID'].values[0]):
+            _df['Region ID'] = _df['Region ID'].str[:-2]
         _df['TG number'] = _df['TG number'].astype(int)
         for _c in _df.columns:
             if _c.endswith('SS/cfos fraction'):
@@ -311,11 +319,11 @@ class Cfos():
         self.region_id_2_tg_id = {}
 
         for _i, _row in self.df_exp[['TG number','Region ID','Region name']].iterrows():
-            self.tg_num_2_name[_row['TG number']] = _row['Region name']
-            self.tg_num_2_region_id[_row['TG number']] = _row['Region ID']
+            self.tg_num_2_name[str(_row['TG number'])] = _row['Region name']
+            self.tg_num_2_region_id[str(_row['TG number'])] = str(_row['Region ID'])
 
-            self.region_id_2_name[_row['Region ID']] = _row['Region name']
-            self.region_id_2_tg_id[_row['Region ID']] = _row['TG number']
+            self.region_id_2_name[str(_row['Region ID'])] = _row['Region name']
+            self.region_id_2_tg_id[str(_row['Region ID'])] = str(_row['TG number'])
         
     def gen_zero_value_heatmap_color(self, output_filename):
         _color = "SST"
@@ -391,8 +399,8 @@ class Cfos():
                 _index_names = []
                 for _i in df_non_zero_regions.T.columns:
                     if int(_i) == 1 or int(_i) % 50 == 0 or int(_i)  == df_non_zero_regions.T.columns[-1]:
-                        _index_ids.append(_i)
-                        _index_names.append(df_non_zero_regions.T.columns[_i-1])
+                        _index_ids.append(int(_i))
+                        _index_names.append(df_non_zero_regions.T.columns[int(_i)-1])
                 
                 ax.set_xticks(_index_ids)
                 ax.set_xticklabels(_index_names, fontsize=4, rotation=90)
