@@ -53,8 +53,9 @@ logger.addHandler(fileHandler)
 
 class Cfos():
     def __init__(self, filename, output_dir='output', load_from_files = False):
-
+        logger.info("cfos init begin")
         self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
         self.color_list = ['PV','cfos','SST']
         self.prefix_to_remove_column = ['Unnamed',"average","VEH","EXP","mean","sem","%error",'Analyses']
         
@@ -125,11 +126,11 @@ class Cfos():
         
         self._get_metadata()
 
-        self.get_raw_df('df_raw.csv',True)
-        self.get_agg_df('df_mean_cor_sag.csv',True)
+        self.get_raw_df(output_dir+'/df_raw.csv',load_from_files)
+        self.get_agg_df(output_dir+'/df_mean_cor_sag.csv',load_from_files)
         
 
-
+        logger.info("cfos init done")
         #df_exp.head()
     def preprocess_summary(self):
         summary = ''
@@ -243,14 +244,13 @@ class Cfos():
 
 
     def get_agg_df(self, filename='df_mean_cor_sag.csv', load_from_files=False):
-        _filename = f'{self.output_dir}/{filename}'
 
 
         
 
         if load_from_files:
-            self.df_mean_cor_sag = pd.read_csv(_filename)
-            logger.info(f'loaded agg data: {_filename}')
+            self.df_mean_cor_sag = pd.read_csv(filename)
+            logger.info(f'loaded agg data: {filename}')
             return
         logger.info(f'creating agg data...')
         _df_total = self.df_total
@@ -259,14 +259,13 @@ class Cfos():
         print(_df_total)
         df_mean_cor_sag = _df_total.groupby(['sample_id', 'color','veh_exp'], as_index=False)[_df_total.columns[:-4]].agg('mean')
         df_mean_cor_sag.index.name = None
-        df_mean_cor_sag.to_csv(_filename, encoding='utf-8', index=None)
-        logger.info(f'agg data saved into {_filename}')
+        df_mean_cor_sag.to_csv(filename, encoding='utf-8', index=None)
+        logger.info(f'agg data saved into {filename}')
 
         self.df_mean_cor_sag = df_mean_cor_sag
 
 
-    def get_raw_df(self, filename='df_raw.csv', load_from_files = False):
-        raw_file_name = f'{self.output_dir}/{filename}'
+    def get_raw_df(self, raw_file_name='df_raw.csv', load_from_files = False):
 
         if load_from_files:
             self.df_total = pd.read_csv(raw_file_name)
