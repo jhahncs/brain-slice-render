@@ -17,15 +17,20 @@ import importlib
 from flask_session import Session
 import sys
 from datetime import timedelta
-
+import shutil
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, '../cfos')
 
 UPLOAD_FOLDER = 'files'
+DATA_FOLDER = 'projects'
+
 app = Flask(__name__)
 CORS(app)
 
+from  cfos_util import Cfos
 
+from cfos_stat import cal_fold, cal_pvalue, cal_fdr
+from cfos_brainheatmap import build_dict, gen_brain_heatmap
 
 #server_session.config["SESSION_PERMANENT"] = False     # Sessions expire when the browser is closed
 #server_session.config["SESSION_TYPE"] = "filesystem"     # Store session data in files
@@ -58,25 +63,22 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 ALLOWED_EXTENSIONS = set(['xlsx'])
 
-import cfos_util
-importlib.reload(cfos_util)
 
-import cfos_stat
-importlib.reload(cfos_stat)
 
 
 def allowed_file(filename): # filename을 보고 지원하는 media type인지 판별
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
-@app.route('/upload', methods=['POST'])
-def upload():
+@app.route('/newdata', methods=['POST'])
+def newdata():
     sta = time.time() # 시간 측정
     #sema.acquire() # 세마포어 획득
 
 
     
-    print(session.items())
+    print("============================================")
+    '''
     if not session.get("username"):
         client_port = request.environ.get('REMOTE_PORT')
         user_agent = request.headers.get('User-Agent')
@@ -85,34 +87,46 @@ def upload():
     else:
         print("LOGGEDIN")
     print(session.items())
+    '''
+    
 
-    time.sleep(10)   
+    #time.sleep(10)   
 
+    try:
+        if 'file' not in request.files:
+            return {'message': '파일을 선택해주세요.'}, 400
 
+        file = request.files['file']
+        if file.filename == '':
+            return {'message': '파일을 선택해주세요.'}, 400
 
-    if 'image' not in request.files:
-        return {'message': '파일을 선택해주세요.'}, 400
-
-    file = request.files['image']
-    if file.filename == '':
-        return {'message': '파일을 선택해주세요.'}, 400
-
-    if file and allowed_file(file.filename.lower()):
+        if not file or not allowed_file(file.filename.lower()):
+            return {'message': '파일을 선택해주세요.'}, 400
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
         
 
-        if not session.get("cfos_obj"):
-            print(filepath)
-            #cfos = cfos_util.Cfos(filepath,'output')
-            cfos = str(sta)
-            session['cfos_obj'] = cfos
-            print("cfos object created",cfos)
-        else:
-            
-            cfos = session['cfos_obj']
-            print("cfos object exists",cfos)
+        
+                
+        output_dir = DATA_FOLDER+"/"+request.form.get('newDataName')
+        print(filepath)
+        print(output_dir)
+        cfos = Cfos(filename = filepath, output_dir = output_dir, load_from_files = False)
+        df_fold = cal_fold(cfos, cfos.df_mean_cor_sag)
+        filename_pvalue_permutation_test = output_dir+"/pvalue_permutation_test.csv"
+        filename_pvalue_ttest = output_dir+"/pvalue_ttest.csv"
+        filename_pvalue_permutation_test_fdr = output_dir+"/pvalue_permutation_test_fdr.csv"
+        filename_pvalue_ttest_fdr = output_dir+"/pvalue_ttest_fdr.csv"
+
+        df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 'permutation_test',filename_pvalue_permutation_test)
+        df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
+        df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
+        df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
+
+        #cfos = str(sta)
+        #session['cfos_obj'] = cfos
+
         '''
         img = Image.open('files/heatmap_cfos total.png')
         byte_arr = io.BytesIO()
@@ -128,56 +142,57 @@ def upload():
         '''
         response = {
             #'message': cfos.preprocess_summary(),
-            'message': cfos,
+            'message': output_dir,
         }
-        print("done")
         #sema.release() # 세마포어 릴리즈
         return jsonify(response)
 
         
 
         return jsonify({'message': '파일이 업로드되었습니다.', 'filename': filepath, 'image_path':'files/heatmap_cfos total.png'}), 200
-    else:
-        return {'message': '업로드에 실패했습니다.'}, 500
+
+    except Exception as e:
+        print(e)
+        return {'message': e}, 500
 
 
+        if request.method == 'POST':
+            file = request.files['file']
+        if file:
+            filename = secure_filename(file.filename)
+            filename = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(filename)
+        
+        
+        import cfos_util
+        importlib.reload(cfos_util)
 
-    if request.method == 'POST':
-        file = request.files['file']
-    if file:
-        filename = secure_filename(file.filename)
-        filename = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filename)
-       
-    
-    import cfos_util
-    importlib.reload(cfos_util)
-
-    import cfos_stat
-    importlib.reload(cfos_stat)
-
-
-    cfos = cfos_util.Cfos(filename,'output')
-
-    df_pvalue_permutation_test = cfos_stat.cal_pvalue(cfos.df_mean_cor_sag, 'permutation_test',cfos.region_id_2_tg_id, cfos.region_id_2_name,'output/pvalue_permutation_test.csv')
-    df_pvalue_ttest = cfos_stat.cal_pvalue(cfos.df_mean_cor_sag, 't_test',cfos.region_id_2_tg_id, cfos.region_id_2_name,'output/pvalue_ttest.csv')
+        import cfos_stat
+        importlib.reload(cfos_stat)
 
 
-    df_fdr_permutation_test = cfos_stat.cal_fdr(df_pvalue_permutation_test, cfos.region_id_2_tg_id, cfos.region_id_2_name, _alpha = 0.05, result_filename='output/pvalue_permutation_test_fdr.csv')
-    df_fdr_t_test = cfos_stat.cal_fdr(df_pvalue_ttest, cfos.region_id_2_tg_id, cfos.region_id_2_name, _alpha = 0.05, result_filename='output/pvalue_ttest_fdr.csv')
+        cfos = cfos_util.Cfos(filename,'output')
+
+        df_pvalue_permutation_test = cfos_stat.cal_pvalue(cfos.df_mean_cor_sag, 'permutation_test',cfos.region_id_2_tg_id, cfos.region_id_2_name,'output/pvalue_permutation_test.csv')
+        df_pvalue_ttest = cfos_stat.cal_pvalue(cfos.df_mean_cor_sag, 't_test',cfos.region_id_2_tg_id, cfos.region_id_2_name,'output/pvalue_ttest.csv')
 
 
-    #cfos.gen_zero_value_heatmap_color(f'output/regions_with_zero_values.pdf')
-    return render_template('gemma.html')#, answer = response)
+        df_fdr_permutation_test = cfos_stat.cal_fdr(df_pvalue_permutation_test, cfos.region_id_2_tg_id, cfos.region_id_2_name, _alpha = 0.05, result_filename='output/pvalue_permutation_test_fdr.csv')
+        df_fdr_t_test = cfos_stat.cal_fdr(df_pvalue_ttest, cfos.region_id_2_tg_id, cfos.region_id_2_name, _alpha = 0.05, result_filename='output/pvalue_ttest_fdr.csv')
+
+
+        #cfos.gen_zero_value_heatmap_color(f'output/regions_with_zero_values.pdf')
+        return render_template('gemma.html')#, answer = response)
 
 @app.route('/load', methods=['POST'])
 def load():
     print('load')
     if request.method == 'POST':
         
-        data = request.json
-        dirname = data['dirname']
-        cfos = cfos_util.Cfos(None, "projects/"+dirname, load_from_files=True)
+
+        output_dir = DATA_FOLDER+"/"+request.form.get('dataname')
+
+        cfos = Cfos(filename = None,output_dir = output_dir, load_from_files=True)
         
         response = {
             'message': cfos.preprocess_summary(),
@@ -185,6 +200,24 @@ def load():
         }
         
         return jsonify(response)
+
+@app.route('/removedata', methods=['POST'])
+def removedata():
+    print("removedata")
+
+    removed_data = DATA_FOLDER+"/"+request.form.get('dataname')
+
+    print(removed_data)
+    #os.removedirs(removed_data)
+    try:
+        shutil.rmtree(removed_data)
+    except:
+        pass
+    response = {
+        'message': removed_data,
+    }
+    
+    return jsonify(response)
 
 @app.route('/projects', methods=['GET','POST'])
 def projects():
@@ -202,21 +235,29 @@ def analysis():
     sta = time.time() # 시간 측정
     #sema.acquire() # 세마포어 획득
 
-    print('analysis',session['username'])
-    pvalue = request.form['pvalue']
-    fold_up = request.form['fold_up']
-    fold_down = request.form['fold_down']
-    dirname = request.form['dir']
-    print(pvalue,fold_up,fold_down,dirname)
-    cfos = cfos_util.Cfos(None, "projects/"+dirname, load_from_files=True)
-    if not session.get("username"):
-        response.data = json.dumps({
-            "code": "no file",
-        })
-        response.content_type = "application/json"
-        return response
+    print('analysis')
+    pvalue_th = request.form.get('pvalue')
+    fold_up = request.form.get('fold_up')
+    fold_down = request.form.get('fold_down')
+    output_dir = request.form.get('dir')
+    print(pvalue_th,fold_up,fold_down,output_dir)
 
+    filename_pvalue_permutation_test = output_dir+"/pvalue_permutation_test.csv"
+    filename_pvalue_ttest = output_dir+"/pvalue_ttest.csv"
+    filename_pvalue_permutation_test_fdr = output_dir+"/pvalue_permutation_test_fdr.csv"
+    filename_pvalue_ttest_fdr = output_dir+"/pvalue_ttest_fdr.csv"
     
+    cfos = Cfos(None, DATA_FOLDER+"/"+output_dir, load_from_files=True)
+    df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 'permutation_test',filename_pvalue_permutation_test)
+    df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
+    df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
+    df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
+
+    color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, cfos.df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
+
+    color_list = list([c for c in cfos.df_fold.columns if c not in ['Region ID','TG number','Region Name']])
+    color_list = color_list[:2]
+    #gen_brain_heatmap(DATA_FOLDER, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
 
     
     output_img_filename = f'files/heatmap_cfos_total.png'
@@ -231,7 +272,8 @@ def analysis():
     encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
     eta = time.time() # 시간 측정
     response = {
-        'message': f'{pvalue} {fold_up} {fold_down}',
+        'message': f'{pvalue_th} {fold_up} {fold_down}',
+        'df':df_sig_region_fold.to_dict(orient='records'),
         'image': encoded_image,
         'elapsed_time': eta - sta
     }
