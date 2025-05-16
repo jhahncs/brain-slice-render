@@ -224,7 +224,7 @@ const [downloadLink, setDownloadLink] = useState('');
     }
 
     setIsSubmitting_add(true);
-
+    setIsLoading(true);
 
 
     console.log(newDataName)
@@ -257,7 +257,7 @@ const [downloadLink, setDownloadLink] = useState('');
     setSelectedFile(null);
     setNewDataName('');
     setIsSubmitting_add(false);
-
+    setIsLoading(false);
 
   };
 
