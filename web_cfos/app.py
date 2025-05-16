@@ -264,8 +264,8 @@ def analysis():
     if analysisMode == 'both':
 
         color_list = list([c for c in df_fold.columns if c not in ['Region ID','TG number','Region Name']])
-        color_list = color_list[:1]
-        gen_brain_heatmap(DATA_FOLDER, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
+        #color_list = color_list[:1]
+        gen_brain_heatmap(DATA_FOLDER+"/"+output_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
     
 
     output_img_filename = f'files/heatmap_cfos_total.png'
