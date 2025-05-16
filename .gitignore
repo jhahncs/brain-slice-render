@@ -5,6 +5,7 @@ tests/*.mp4
 logs
 web_cfos/**/node_modules
 web_cfos/**/flask_session
+web_cfos/**/files
 *.xlsx
 *.vti
 *.npy

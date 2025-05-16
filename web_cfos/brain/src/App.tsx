@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect , useMemo } from 'react'
 import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
+import { useReactTable,getCoreRowModel, getPaginationRowModel ,createColumnHelper} from '@tanstack/react-table'
+import Table, {Show} from './Test.tsx';
+import axios from "axios";
+import { saveAs } from 'file-saver';
+
 
 const Toolbox = {
   display: "flex",
   width: "100%",
   margin_bottom: "10px",
 };
+
 
 
 
@@ -32,13 +38,20 @@ function App() {
   const [foldup, setFoldup] = useState(1.5);
   const [folddown, setFolddown] = useState(0.67);
 
+    const [isLoading, setIsLoading] = useState(false);
+
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [preprocessSummary, setPreprocessSummary] = useState('');
   const [postprocessSummary, setPostprocessSummary] = useState(0);
   const [imageData, setImageData] = useState(1);
   const [isSubmitting_add, setIsSubmitting_add] = useState(false);
-  const [isSubmitting_gen, setIsSubmitting_gen] = useState(false);
+  const [isSubmitting_analysis_list, setIsSubmitting_analysis_list] = useState(false);
+  const [isSubmitting_analysis_both, setIsSubmitting_analysis_both] = useState(false);
   const [isFirstRender, setIsFirstRender] = useState(true); // Using useRef to track initial render
+const [downloadLink, setDownloadLink] = useState('');
+  const [analysisMode, setAnalysisMode] = useState(null);
+
 
   const onFileInputClick = (event) => {
     //console.log(selectedFile)
@@ -104,37 +117,60 @@ function App() {
 
     }
   };
+  const [significantRegions, setSignificantRegions] = useState([]);
+
+
 
 
   const handleGenerate = async (event) => {
     event.preventDefault();
-    setIsSubmitting_gen(true);
+    if(selectedProjects.length == 0)
+    {
 
+      alert("please select a data")
+      return
+    }
+
+    setIsSubmitting_analysis_list(true)
+    setIsSubmitting_analysis_both(true)
+    setIsLoading(true);
+
+    
     console.log(projects)
-    console.log(selectedProjects)
+    console.log(selectedProjects[0])
     const formData = new FormData();
     formData.append('pvalue', pvalue)
     formData.append('fold_up', foldup)
     formData.append('fold_down', folddown)
-    formData.append('dir', projects[selectedProjects[0]])
+    formData.append('analysisMode', analysisMode)
+    formData.append('dataname', selectedProjects[0])
 
 
     try {
       const response = await fetch('/analysis', {
         method: 'POST',
-        body: formData
+        body: formData,
+        //responseType: 'arraybuffer',
       });
 
+      //const blob = new Blob([response.data], { type: 'application/zip' });
+      //saveAs(blob, 'archive.zip');
+      
       const data = await response.json();
       setPostprocessSummary(data.message);
-
+      console.log(data)
       setImageData(data.image)
-
+      //setSignificantRegions(data.df);
+      setDownloadLink(data.zip)
+      alert("please click the download button ")
     } catch (error) {
       console.error('업로드 실패', error);
     }
     finally {
-      setIsSubmitting_gen(false);
+          setIsSubmitting_analysis_list(false)
+    setIsSubmitting_analysis_both(false)
+        setIsLoading(false);
+
 
     }
   };
@@ -297,19 +333,73 @@ function App() {
 
 
   };
+  const [data, setData] = useState<Show[]>();
 
-
+const columnHelper = createColumnHelper<Show>();
+  //define our table headers and data
+  const columns = useMemo(
+    () => [
+      //create a header group:
+      columnHelper.group({
+        id: "tv_show",
+        header: () => <span>TV Show</span>,
+        //now define all columns within this group
+        columns: [
+          columnHelper.accessor("show.name", {
+            header: "Name",
+            cell: (info) => info.getValue(),
+          }),
+          columnHelper.accessor("show.type", {
+            header: "Type",
+            cell: (info) => info.getValue(),
+          }),
+        ],
+      }),
+      //create another group:
+      columnHelper.group({
+        id: "details",
+        header: () => <span> Details</span>,
+        columns: [
+          columnHelper.accessor("show.language", {
+            header: "Language",
+            cell: (info) => info.getValue(),
+          }),
+          columnHelper.accessor("show.genres", {
+            header: "Genres",
+            cell: (info) => info.getValue(),
+          }),
+          columnHelper.accessor("show.runtime", {
+            header: "Runtime",
+            cell: (info) => info.getValue(),
+          }),
+          columnHelper.accessor("show.status", {
+            header: "Status",
+            cell: (info) => info.getValue(),
+          }),
+        ],
+      }),
+    ],
+    [],
+  );
+  const fetchDataTV = async () => {
+    const result = await axios("https://api.tvmaze.com/search/shows?q=snow");
+    console.log(result)
+    setData(result.data);
+  };
+  useEffect(() => {
+    fetchDataTV();
+  }, []);
   return (
 
-    <div>
+    <div style={{ cursor: isLoading ? 'wait' : 'default' }}>
 
       <table border='true'>
         <thead></thead>
         <tbody>
           <tr>
-            <td width="80%"><h4>Data available in the server </h4>(reflesh this page if data is not shown as you expected)</td>
+            <td width="80%"><h4>Select a data uploaded in the server </h4></td>
             <td rowSpan='2'>
-
+              <b>Upload an Excel file</b>
               <div className={isSubmitting_add ? 'submitting' : ''}>
 
                 <form onSubmit={handleAddData}>
@@ -359,14 +449,10 @@ function App() {
 
 
 
-      <h4>Contents in the selected data</h4>
+      <h3>Contents in the selected data</h3>
 
       <p>{preprocessSummary.replace("/\n/g", "<br />")}</p>
-
-
-
-
-      <h3>Brain heatmap</h3>
+<h3>Significant Regions</h3>
 
       <form onSubmit={handleGenerate}>
         <table>
@@ -378,11 +464,11 @@ function App() {
 
               </td>
               <td>
-                Fold change(up) : <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
+                Fold EXP/VEH (up) : <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
 
               </td>
               <td>
-                Fold change(down) : <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
+                Fold EXP/VEH (down) : <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
 
               </td>
 
@@ -390,8 +476,16 @@ function App() {
 
           </tbody>
         </table>
-        <button type="submit" disabled={isSubmitting_gen}>{isSubmitting_gen ? 'Processing...' : 'Generate'}</button>
+        <button type="submit" onClick={() => setAnalysisMode('list')} disabled={isSubmitting_analysis_list}>{isSubmitting_analysis_list ? 'Processing...(may take a few seconds)' : 'Region List Only'}</button> &nbsp;&nbsp;
+        <button type="submit" onClick={() => setAnalysisMode('both')} disabled={isSubmitting_analysis_both}>{isSubmitting_analysis_both ? 'Processing...(may take a few minutes)' : 'Region List & Heatmap (may take a few miniutes)'}</button>
       </form>
+
+<a href={downloadLink}  disabled="disabled">download</a>
+<hr></hr>
+
+      <h3>Brain heatmap</h3>
+<i>Some regions has not been visualized that are not matched to Brain Atlas.</i><br></br>
+
       <br></br>
 
 

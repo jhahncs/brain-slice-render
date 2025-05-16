@@ -93,7 +93,7 @@ def cal_pvalue(cfos,_df_agg, test_method, result_filename_permutation='output/pv
             color_code_list.append(_color)
             p_t_list.append(test_method)
 
-        logger.info(f'the number of jobs:{len(color_code_list)}')
+        logger.info(f'cal_pvalue. the number of jobs:{len(color_code_list)}')
         with multiprocessing.Pool() as pool: # Use a pool of 4 processes
             results = pool.starmap(_stat_test, zip(df_list, color_code_list, p_t_list))
         df_pvalue = pd.concat(results)
@@ -179,7 +179,7 @@ def cal_fdr(cfos,_df_pvalue,  _alpha = 0.05, result_filename='output/pvalue_perm
             columns_list.append(color_columns)
             _alpha_list.append(0.05)
 
-        logger.info(f'the number of jobs:{len(row_list)}')
+        logger.info(f'cal_fdr. the number of jobs:{len(row_list)}')
         with multiprocessing.Pool() as pool: # Use a pool of 4 processes
             results = pool.starmap(_cal_fdr, zip(row_list, columns_list, _alpha_list))
         df_pvalue_fdr = pd.concat(results)

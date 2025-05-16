@@ -139,21 +139,31 @@ def build_dict(cfos, df_fold, ptest, pvalue_th, fold_up, fold_down):
     for c in color_list:
         if c in color_2_dict_up:
             for region_id, fold in color_2_dict_up[c].items():
-                _row = {}
-                _row['color'] = c
-                _row['TG number'] = cfos.region_id_2_tg_id[region_id]
-                _row['Region ID'] = region_id
-                _row['Region Name'] = cfos.region_id_2_name[region_id]
-                _row['fold'] = fold 
+                region_id = str(region_id)
+                try:
+                    _row = {}
+                    _row['color'] = c
+                    _row['TG number'] = cfos.region_id_2_tg_id[region_id]
+                    _row['Region ID'] = region_id
+                    _row['Region Name'] = cfos.region_id_2_name[region_id]
+                    _row['fold'] = fold 
+                except:
+                    print("NOT FOUND:"+region_id)
+                    continue
                 _rows.append(_row)
         if c in color_2_dict_down:
             for region_id, fold in color_2_dict_down[c].items():
-                _row = {}
-                _row['color'] = c
-                _row['TG number'] = cfos.region_id_2_tg_id[region_id]
-                _row['Region ID'] = region_id
-                _row['Region Name'] = cfos.region_id_2_name[region_id]
-                _row['fold'] = fold 
+                region_id = str(region_id)
+                try:
+                    _row = {}
+                    _row['color'] = c
+                    _row['TG number'] = cfos.region_id_2_tg_id[region_id]
+                    _row['Region ID'] = region_id
+                    _row['Region Name'] = cfos.region_id_2_name[region_id]
+                    _row['fold'] = fold 
+                except:
+                    print("NOT FOUND:"+region_id)
+                    continue   
                 _rows.append(_row)           
     df_sig_region_fold = pd.DataFrame(_rows)
     return color_2_dict_up, color_2_dict_down, df_sig_region_fold
@@ -290,7 +300,7 @@ def _gen_brain_heatmap(output_dir, ptest,pvalue_th, color_code, fold_up, fold_do
     ax_col_index = 0
     ax = fig.add_subplot(spec[ax_row_index,:])
     ax.set_axis_off()
-    ax.text(0, 0.1, f'Significant regions were determined by a t-test with FDR corrected (pvalue < {pvalue_th})\nBlue color: Fold \u0394 (VEH/EXP) > {fold_up},  {len(color_2_dict_up[color_code])} regions visualized.\nRed color: Fold \u0394 (VEH/EXP) < {fold_down},  {len(color_2_dict_down[color_code])} regions visualized.\nEach three rows is with frontal(Rostal \u2192 Caudal), saggital, horizontal view, respectively\n',  fontsize = 8)
+    ax.text(0, 0.1, f'Significant regions were determined by a t-test with FDR corrected (pvalue < {pvalue_th})\nBlue color: Fold \u0394 (EXP/VEH) > {fold_up},  {len(color_2_dict_up[color_code])} regions visualized.\nRed color: Fold \u0394 (EXP/VEH) < {fold_down},  {len(color_2_dict_down[color_code])} regions visualized.\nEach three rows is with frontal(Rostal \u2192 Caudal), saggital, horizontal view, respectively\n',  fontsize = 8)
     plt.tight_layout()
     #plt.show()
     fig.savefig(f'{output_dir}/heatmap_{color_code.replace("/","_")}.png', dpi=600, bbox_inches='tight', pad_inches=1)

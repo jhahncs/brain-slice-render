@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, session
+from flask import Flask, jsonify, session, send_file, make_response, send_from_directory
 from flask import Flask, render_template
 from flask import request
 import os
@@ -20,7 +20,8 @@ from datetime import timedelta
 import shutil
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, '../cfos')
-
+import zipfile
+import glob
 UPLOAD_FOLDER = 'files'
 DATA_FOLDER = 'projects'
 
@@ -236,51 +237,87 @@ def analysis():
     #sema.acquire() # 세마포어 획득
 
     print('analysis')
-    pvalue_th = request.form.get('pvalue')
-    fold_up = request.form.get('fold_up')
-    fold_down = request.form.get('fold_down')
-    output_dir = request.form.get('dir')
+    pvalue_th = float(request.form.get('pvalue'))
+    fold_up = float(request.form.get('fold_up'))
+    fold_down = float(request.form.get('fold_down'))
+    output_dir = request.form.get('dataname')
+    analysisMode = request.form.get('analysisMode')
     print(pvalue_th,fold_up,fold_down,output_dir)
 
-    filename_pvalue_permutation_test = output_dir+"/pvalue_permutation_test.csv"
-    filename_pvalue_ttest = output_dir+"/pvalue_ttest.csv"
-    filename_pvalue_permutation_test_fdr = output_dir+"/pvalue_permutation_test_fdr.csv"
-    filename_pvalue_ttest_fdr = output_dir+"/pvalue_ttest_fdr.csv"
+    filename_pvalue_permutation_test = DATA_FOLDER+"/"+output_dir+"/pvalue_permutation_test.csv"
+    filename_pvalue_ttest = DATA_FOLDER+"/"+output_dir+"/pvalue_ttest.csv"
+    filename_pvalue_permutation_test_fdr = DATA_FOLDER+"/"+output_dir+"/pvalue_permutation_test_fdr.csv"
+    filename_pvalue_ttest_fdr = DATA_FOLDER+"/"+output_dir+"/pvalue_ttest_fdr.csv"
     
     cfos = Cfos(None, DATA_FOLDER+"/"+output_dir, load_from_files=True)
+    df_fold = cal_fold(cfos, cfos.df_mean_cor_sag)
+
     df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 'permutation_test',filename_pvalue_permutation_test)
     df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
     df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
     df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
 
-    color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, cfos.df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
 
-    color_list = list([c for c in cfos.df_fold.columns if c not in ['Region ID','TG number','Region Name']])
-    color_list = color_list[:2]
-    #gen_brain_heatmap(DATA_FOLDER, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
+    color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
+    df_sig_region_fold.to_csv(DATA_FOLDER+"/"+output_dir+"/heatmap_significant_regions.csv",index=None)
 
+    if analysisMode == 'both':
+
+        color_list = list([c for c in df_fold.columns if c not in ['Region ID','TG number','Region Name']])
+        color_list = color_list[:1]
+        gen_brain_heatmap(DATA_FOLDER, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
     
+
     output_img_filename = f'files/heatmap_cfos_total.png'
-    print('beging')
-    #cfos.gen_zero_value_heatmap_color(output_img_filename)
-    print('end')
-    img = Image.open(output_img_filename)
-    byte_arr = io.BytesIO()
-    img.save(byte_arr,  format='PNG')
+    #print('beging')
+    #gen_brain_heatmap(DATA_FOLDER+"/"+output_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
+    #print('end')
+    #img = Image.open(output_img_filename)
+    #byte_arr = io.BytesIO()
+    #img.save(byte_arr,  format='PNG')
+    txtfiles = []
+    for file in glob.glob(DATA_FOLDER+"/"+output_dir+"/heatmap*"):
+        txtfiles.append(file)
+    memory_file = io.BytesIO()
+    zip_file_name = f"files/{str(sta)}.zip"
+    with zipfile.ZipFile(memory_file, 'w') as myzip:
+    # Add files to the archive
+        for t in txtfiles:
+            myzip.write(t,arcname=t.replace(DATA_FOLDER+"/"+output_dir,""))
+    memory_file.seek(0)
+    with open(zip_file_name, 'wb') as file:
+        file.write(memory_file.read())
+    memory_file.seek(0)
+    #response = make_response(memory_file.read())
+    #response.headers.set('Content-Type', 'application/zip')
+    #response.headers.set('Content-Disposition', 'attachment', filename='example.zip')
 
-
-    encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
+    #return response
+    #return send_file(memory_file, download_name='result.zip', as_attachment=True)
+    hostname = request.headers.get('Host')
+    #port = request.headers.get('Port')
+    #encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
     eta = time.time() # 시간 측정
     response = {
         'message': f'{pvalue_th} {fold_up} {fold_down}',
-        'df':df_sig_region_fold.to_dict(orient='records'),
-        'image': encoded_image,
+        #'df':df_sig_region_fold.to_dict(orient='records'),
+        'zip':f'http://{hostname}/download/{str(sta)}.zip',
+    #    'image': encoded_image,
         'elapsed_time': eta - sta
     }
     
     return jsonify(response)
-    
-        
+
+@app.route("/download/<path:filename>")
+def download_test(filename):
+	#return send_file("files/test.text", mimetype="text/plain", as_attachment=True)
+    filepath = os.path.join('files', filename)
+
+    # Check if the file exists
+    if os.path.isfile(filepath):
+        return send_from_directory('files', filename, as_attachment=True)
+    else:
+        return "File not found", 404
 @app.route('/get_image', methods=['GET'])
 def get_image():
     
