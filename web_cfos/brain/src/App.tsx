@@ -405,7 +405,7 @@ const columnHelper = createColumnHelper<Show>();
                 <form onSubmit={handleAddData}>
                   <input type="file" id="myFileInput" onClick={onFileInputClick} onChange={handleFileChange} />
                   Data Name: <input type="text" id='new_data_name' defaultValue={newDataName} onChange={handleNewDataNameChange} />
-                  <button type="submit" disabled={isSubmitting_add}>{isSubmitting_add ? 'Processing...(may take a few seconds)' : 'Add Data'}</button>
+                  <button type="submit" disabled={isSubmitting_add}>{isSubmitting_add ? 'Processing...(may take a few minutes)' : 'Add Data'}</button>
 
 
                 </form>

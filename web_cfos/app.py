@@ -250,7 +250,7 @@ def analysis():
     filename_pvalue_ttest_fdr = DATA_FOLDER+"/"+output_dir+"/pvalue_ttest_fdr.csv"
     
     cfos = Cfos(None, DATA_FOLDER+"/"+output_dir, load_from_files=True)
-    df_fold = cal_fold(cfos, cfos.df_mean_cor_sa,None, DATA_FOLDER+"/"+output_dir+"/fold.csv")
+    df_fold = cal_fold(cfos, cfos.df_mean_cor_sag,None, DATA_FOLDER+"/"+output_dir+"/fold.csv")
 
     df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 'permutation_test',filename_pvalue_permutation_test)
     df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
