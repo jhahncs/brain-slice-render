@@ -258,7 +258,7 @@ def analysis():
     df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
 
     temp_dir = UPLOAD_FOLDER+"/"+output_dir+"/"+str(sta)
-    os.mkdirs(temp_dir)
+    os.makedirs(temp_dir)
 
     color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
     df_sig_region_fold.to_csv(temp_dir+"/heatmap_significant_regions.csv",index=None)
