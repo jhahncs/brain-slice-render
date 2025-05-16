@@ -257,15 +257,18 @@ def analysis():
     df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
     df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
 
+    temp_dir = UPLOAD_FOLDER+"/"+output_dir+"/"+str(sta)
+
+    os.mkdir(temp_dir)
 
     color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
-    df_sig_region_fold.to_csv(DATA_FOLDER+"/"+output_dir+"/heatmap_significant_regions.csv",index=None)
+    df_sig_region_fold.to_csv(temp_dir+"/heatmap_significant_regions.csv",index=None)
 
     if analysisMode == 'both':
 
         color_list = list([c for c in df_fold.columns if c not in ['Region ID','TG number','Region Name']])
         #color_list = color_list[:1]
-        gen_brain_heatmap(DATA_FOLDER+"/"+output_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
+        gen_brain_heatmap(temp_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
     
 
     output_img_filename = f'files/heatmap_cfos_total.png'
@@ -276,14 +279,14 @@ def analysis():
     #byte_arr = io.BytesIO()
     #img.save(byte_arr,  format='PNG')
     txtfiles = []
-    for file in glob.glob(DATA_FOLDER+"/"+output_dir+"/heatmap*"):
+    for file in glob.glob(temp_dir+"/heatmap*"):
         txtfiles.append(file)
     memory_file = io.BytesIO()
     zip_file_name = f"files/{str(sta)}.zip"
     with zipfile.ZipFile(memory_file, 'w') as myzip:
     # Add files to the archive
         for t in txtfiles:
-            myzip.write(t,arcname=t.replace(DATA_FOLDER+"/"+output_dir,""))
+            myzip.write(t,arcname=t.replace(temp_dir,""))
     memory_file.seek(0)
     with open(zip_file_name, 'wb') as file:
         file.write(memory_file.read())
