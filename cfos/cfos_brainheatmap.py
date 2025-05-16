@@ -207,7 +207,7 @@ def _gen_brain_heatmap(output_dir, ptest,pvalue_th, color_code, fold_up, fold_do
     ax_col_index = 0
     spec_index = 0
     #for subtitle, color, data_dict in [(f'Fold > {fold_up}','Blues',color_2_dict_up[color_code]),(f'Fold < {fold_down}',"Reds_r",color_2_dict_down[color_code])]:
-    for _ii, (subtitle, color, _data_dict) in enumerate([(f'Fold > {fold_up}','Blues',color_2_dict_up[color_code]),(f'Fold < {fold_down}',"Reds_r",color_2_dict_down[color_code])]):
+    for _ii, (subtitle, color, _data_dict) in enumerate([(f'Fold > {fold_up}','Greens',color_2_dict_up[color_code]),(f'Fold < {fold_down}',"Reds_r",color_2_dict_down[color_code])]):
         #print(data_dict)
         #logger.info(f'{subtitle},{color_code},{len(data_dict)}')
         print(f'{subtitle},{color_code},{len(_data_dict)}')
