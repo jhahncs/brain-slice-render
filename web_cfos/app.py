@@ -330,7 +330,7 @@ def brainheatmap():
         for file in glob.glob(temp_dir+"/heatmap*"):
             txtfiles.append(file)
         memory_file = io.BytesIO()
-        zip_file_name = f"files/{str(sta)}.zip"
+        zip_file_name = f"files/{str(sta)}_{output_dir}_{_filename_from_params}.zip"
         with zipfile.ZipFile(memory_file, 'w') as myzip:
         # Add files to the archive
             for t in txtfiles:
@@ -346,7 +346,7 @@ def brainheatmap():
         #encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
         response = {
             'df':df_sig_region_fold.to_dict(orient='records'),
-            'zip':f'http://{hostname}/download/{output_dir}_{_filename_from_params}.zip',
+            'zip':f'http://{hostname}/download/{str(sta)}_{output_dir}_{_filename_from_params}.zip',
             #'elapsed_time': eta - sta
         }
         return jsonify(response)
