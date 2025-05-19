@@ -1,6 +1,7 @@
 import logging
 
 import pandas as pd
+from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -50,6 +51,8 @@ fileHandler.suffix = "-%Y%m%d"
 fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
 
+def filename_from_params(pvalue_th, fold_up, fold_down):
+    return "p_"+str(pvalue_th)+"_"+"up_"+str(fold_up)+"_"+"down_"+str(fold_down)
 
 class Cfos():
     def __init__(self, filename, output_dir='output', load_from_files = False):
@@ -146,11 +149,10 @@ class Cfos():
             _df['TG number'] = _df['TG number'].astype(str)    
         
     def preprocess_summary(self):
-        summary = ''
-        summary += f'EXP: {self.subject_id_exp}\n'
-        summary += f'VEH: {self.subject_id_veh}\n'
-        summary += f'color:{self.color_list_full}'
-        summary += f'The number of regions with all zero in exp and veh: {len(self.region_ids_with_all_zero_exp_veh)}'
+        summary = OrderedDict()
+        summary['EXP'] = ",".join(self.subject_id_exp)
+        summary['VEH'] = ",".join(self.subject_id_veh)
+        summary['The number of regions with all zero in exp and veh:'] = len(self.region_ids_with_all_zero_exp_veh)
 
         
         return summary

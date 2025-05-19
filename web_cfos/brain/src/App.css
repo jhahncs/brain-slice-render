@@ -8,7 +8,38 @@
   white-space: nowrap;
   width: 1px;
 }
+table {
+  border: 1px solid lightgray;
+}
 
+tbody {
+  border-bottom: 1px solid lightgray;
+}
+
+th {
+  border-bottom: 1px solid lightgray;
+  border-right: 1px solid lightgray;
+  padding: 2px 4px;
+}
+
+.row_selected{
+  border-bottom: 1px solid lightgray;
+  border-right: 1px solid lightgray;
+  padding: 2px 4px;
+  background-color: beige;
+}
+td {
+  border-bottom: 1px solid lightgray;
+  border-right: 1px solid lightgray;
+  padding: 2px 4px;
+}
+tfoot {
+  color: gray;
+}
+
+tfoot th {
+  font-weight: normal;
+}
 .custom-button {
   background-color: #4CAF50;
   border: none;
@@ -21,6 +52,32 @@
   cursor: pointer;
 }
 
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background-color: #f0f0f0;
+  cursor: pointer;
+}
+
+.collapsible-content {
+  padding: 10px;
+  border: 1px solid #ccc;
+  display: none;
+}
+
+.collapsible-content.open {
+  display: block;
+}
+
+.arrow {
+  transition: transform 0.3s ease;
+}
+
+.arrow.up {
+  transform: rotate(180deg);
+}
 
 .App {
   text-align: center;

@@ -33,7 +33,7 @@ except:
     pass
 
 fileHandler = logging.handlers.TimedRotatingFileHandler(
-    filename='logs/log_stat.txt', 
+    filename='logs/log_stat2.txt', 
     when = "midnight" ,  interval=1, backupCount=30
     )
 fileHandler.suffix = "-%Y%m%d"

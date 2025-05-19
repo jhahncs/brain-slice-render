@@ -1,18 +1,16 @@
-import { useState, useEffect , useMemo } from 'react'
+import { useState, useEffect, useMemo, HTMLProps, useRef } from 'react'
 import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
-import { useReactTable,getCoreRowModel, getPaginationRowModel ,createColumnHelper} from '@tanstack/react-table'
-import Table, {Show} from './Test.tsx';
+import { useReactTable, getCoreRowModel, getPaginationRowModel, createColumnHelper, getFilteredRowModel } from '@tanstack/react-table'
+import Table, { Show } from './Test.tsx';
 import axios from "axios";
 import { saveAs } from 'file-saver';
-
+import './App.css'
 
 const Toolbox = {
   display: "flex",
   width: "100%",
   margin_bottom: "10px",
 };
-
-
 
 
 
@@ -37,20 +35,25 @@ function App() {
   const [pvalue, setPvalue] = useState(0.05);
   const [foldup, setFoldup] = useState(1.5);
   const [folddown, setFolddown] = useState(0.67);
+    const [isAllDownlodButtonVisible, setIsAllDownlodButtonVisible] = useState(false);
 
-    const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedSignificantRegionRows, setSelectedSignificantRegionRows] = useState([]);
 
 
   const [selectedFile, setSelectedFile] = useState(null);
-  const [preprocessSummary, setPreprocessSummary] = useState('');
+  const [preprocessSummary, setPreprocessSummary] = useState({});
   const [postprocessSummary, setPostprocessSummary] = useState(0);
   const [imageData, setImageData] = useState(1);
+  const [imageBasicStat, setImageBasicStat] = useState(1);
+
   const [isSubmitting_add, setIsSubmitting_add] = useState(false);
   const [isSubmitting_analysis_list, setIsSubmitting_analysis_list] = useState(false);
   const [isSubmitting_analysis_both, setIsSubmitting_analysis_both] = useState(false);
   const [isFirstRender, setIsFirstRender] = useState(true); // Using useRef to track initial render
-const [downloadLink, setDownloadLink] = useState('');
+  const [downloadLink, setDownloadLink] = useState('');
   const [analysisMode, setAnalysisMode] = useState(null);
+const [checkedColors, setCheckedColors] = useState([]);
 
 
   const onFileInputClick = (event) => {
@@ -121,59 +124,6 @@ const [downloadLink, setDownloadLink] = useState('');
 
 
 
-
-  const handleGenerate = async (event) => {
-    event.preventDefault();
-    if(selectedProjects.length == 0)
-    {
-
-      alert("please select a data")
-      return
-    }
-
-    setIsSubmitting_analysis_list(true)
-    setIsSubmitting_analysis_both(true)
-    setIsLoading(true);
-
-    
-    console.log(projects)
-    console.log(selectedProjects[0])
-    const formData = new FormData();
-    formData.append('pvalue', pvalue)
-    formData.append('fold_up', foldup)
-    formData.append('fold_down', folddown)
-    formData.append('analysisMode', analysisMode)
-    formData.append('dataname', selectedProjects[0])
-
-
-    try {
-      const response = await fetch('/analysis', {
-        method: 'POST',
-        body: formData,
-        //responseType: 'arraybuffer',
-      });
-
-      //const blob = new Blob([response.data], { type: 'application/zip' });
-      //saveAs(blob, 'archive.zip');
-      
-      const data = await response.json();
-      setPostprocessSummary(data.message);
-      console.log(data)
-      setImageData(data.image)
-      //setSignificantRegions(data.df);
-      setDownloadLink(data.zip)
-      alert("please click the download button ")
-    } catch (error) {
-      console.error('업로드 실패', error);
-    }
-    finally {
-          setIsSubmitting_analysis_list(false)
-    setIsSubmitting_analysis_both(false)
-        setIsLoading(false);
-
-
-    }
-  };
   const Controls = () => {
     const { zoomIn, zoomOut, resetTransform } = useControls();
 
@@ -267,7 +217,8 @@ const [downloadLink, setDownloadLink] = useState('');
 
   const handleSelectItem = async (index) => {
 
-    setPreprocessSummary('processing..');
+    setIsLoading(true)
+    setPreprocessSummary({'processing..':""});
     console.log('handleSelectItem')
     console.log(index)
 
@@ -288,14 +239,17 @@ const [downloadLink, setDownloadLink] = useState('');
       });
 
       const data = await response.json();
-      //setProjects([...projects, newDataName]);
+     //setProjects([...projects, newDataName]);
       //alert("Successfully removed:"+data['message']);
+      console.log(data['message'])
       setPreprocessSummary(data['message']);
+      setImageBasicStat(data['image'])
     } catch (error) {
-      console.error('업로드 실패', error);
+      console.error('error', error);
 
     }
     finally {
+    setIsLoading(false)
 
 
     }
@@ -305,6 +259,13 @@ const [downloadLink, setDownloadLink] = useState('');
   };
 
   const handleRemoveSelectedItems = async () => {
+
+
+    if (selectedProjects.length == 0) {
+
+      alert("please select a data")
+      return
+    }
 
     console.log(selectedProjects[0])
     const formData = new FormData();
@@ -335,156 +296,405 @@ const [downloadLink, setDownloadLink] = useState('');
   };
   const [data, setData] = useState<Show[]>();
 
-const columnHelper = createColumnHelper<Show>();
+  const columnHelper = createColumnHelper<Show>();
   //define our table headers and data
+
   const columns = useMemo(
     () => [
-      //create a header group:
-      columnHelper.group({
-        id: "tv_show",
-        header: () => <span>TV Show</span>,
-        //now define all columns within this group
-        columns: [
-          columnHelper.accessor("show.name", {
-            header: "Name",
-            cell: (info) => info.getValue(),
-          }),
-          columnHelper.accessor("show.type", {
-            header: "Type",
-            cell: (info) => info.getValue(),
-          }),
-        ],
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <IndeterminateCheckbox
+            {...{
+              checked: table.getIsAllRowsSelected(),
+              indeterminate: table.getIsSomeRowsSelected(),
+              onChange: table.getToggleAllRowsSelectedHandler(),
+            }}
+          />
+        ),
+        cell: ({ row }) => (
+          <div className="px-1">
+            <IndeterminateCheckbox
+              {...{
+                checked: row.getIsSelected(),
+                disabled: !row.getCanSelect(),
+                indeterminate: row.getIsSomeSelected(),
+                onChange: row.getToggleSelectedHandler(),
+              }}
+            />
+          </div>
+        ),
+      },
+
+      columnHelper.accessor("TG number", {
+        header: "TG number",
+        cell: (info) => info.getValue(),
+        enableResizing: true, //disable resizing for just this column
+
       }),
-      //create another group:
-      columnHelper.group({
-        id: "details",
-        header: () => <span> Details</span>,
-        columns: [
-          columnHelper.accessor("show.language", {
-            header: "Language",
-            cell: (info) => info.getValue(),
-          }),
-          columnHelper.accessor("show.genres", {
-            header: "Genres",
-            cell: (info) => info.getValue(),
-          }),
-          columnHelper.accessor("show.runtime", {
-            header: "Runtime",
-            cell: (info) => info.getValue(),
-          }),
-          columnHelper.accessor("show.status", {
-            header: "Status",
-            cell: (info) => info.getValue(),
-          }),
-        ],
+            columnHelper.accessor("Region Name", {
+        header: "Region Name",
+        cell: (info) => info.getValue(),
       }),
+            columnHelper.accessor("fold", {
+        header: "fold",
+        cell: (info) => parseFloat(info.getValue().toFixed(2)),
+        enableColumnFilter: false,
+
+      }),
+      columnHelper.accessor("Region ID", {
+        header: "Region ID",
+        cell: (info) => info.getValue(),
+      }),
+      /*
+      columnHelper.accessor("color", {
+        header: "Color",
+        cell: (info) => info.getValue(),
+        //filterSelectOptions: ['Male', 'Female', 'Other'],
+
+      }),
+      */
     ],
     [],
   );
-  const fetchDataTV = async () => {
-    const result = await axios("https://api.tvmaze.com/search/shows?q=snow");
-    console.log(result)
-    setData(result.data);
-  };
   useEffect(() => {
-    fetchDataTV();
-  }, []);
+
+
+
+    async function fetchBrainheatmap() {
+
+
+
+      /*
+      console.log(significantRegions[Object.keys(selectedSignificantRegionRows)[0]])
+
+      console.log(significantRegions[Object.keys(selectedSignificantRegionRows)[0]])
+      try{
+          console.log(significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
+      }catch (error) {
+        return
+      }
+      finally {
+
+
+      }
+      */
+      setImageData(null)
+      setSignificantRegions(null);
+      setIsAllDownlodButtonVisible(false)
+      if(checkedColors.length == 0)
+        return
+
+      setIsLoading(true)
+
+      console.log(checkedColors[0])
+
+      const formData = new FormData();
+      formData.append('pvalue', pvalue)
+      formData.append('fold_up', foldup)
+      formData.append('fold_down', folddown)
+      //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
+      formData.append('color', checkedColors[0])
+      formData.append('dataname', selectedProjects[0])
+
+
+
+      try {
+        const response = await fetch('/brainheatmap', {
+          method: 'POST',
+          'Content-Type': 'multipart/form-data',
+          body: formData
+        });
+
+        const data = await response.json();
+        if (checkedColors[0] == 'ALL')
+        {
+          setIsAllDownlodButtonVisible(true)
+          setDownloadLink(data.zip)
+        }
+        else{
+
+          setImageData(data.image)
+          setSignificantRegions(data.df);
+        }
+      } catch (error) {
+        console.error('업로드 실패', error);
+      }
+      finally {
+      setIsLoading(false)
+
+      }
+    }
+    
+
+    fetchBrainheatmap()
+
+
+
+
+
+  }, [checkedColors]);
+
+  const handleCheckboxColorsChange = (event) => {
+    event.preventDefault();
+     if (selectedProjects.length == 0) {
+
+      alert("please select a data")
+      return
+    }
+    console.log(event.target)
+    console.log(event.target.checked)
+    console.log(checkedColors)
+    setIsLoading(true)
+    const itemValue = event.target.value;
+    const isChecked = event.target.checked;
+
+    if (isChecked) {
+      //setCheckedColors([...checkedColors, itemValue]);
+      setCheckedColors([itemValue]);
+      
+    } else {
+      //setCheckedColors(checkedColors.filter((item) => item !== itemValue));
+      setCheckedColors([]);
+    }
+    setIsLoading(false)
+  }
+
+
+ const color_basic = [ 'SST','PV','cfos', 'cfos total' ];
+ const color_minus = [ 'SST-PV-cfos', 'SST-cfos',    'PV-cfos', 'SST-PV', ];
+const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos fraction'];
+  const [isVisible_basic, setIsVisible_basic] = useState(false);
+
+  const toggleVisibility_basic = () => {
+    setIsVisible_basic(!isVisible_basic);
+  };
+  const [isVisible_brainheatmap, setIsVisible_brainheatmap] = useState(true);
+
+  const toggleVisibility_brainheatmap = () => {
+    setIsVisible_brainheatmap(!isVisible_brainheatmap);
+  };
+
+  
   return (
 
     <div style={{ cursor: isLoading ? 'wait' : 'default' }}>
 
-      <table border='true'>
-        <thead></thead>
-        <tbody>
-          <tr>
-            <td width="80%"><h4>Select a data uploaded in the server </h4></td>
-            <td rowSpan='2'>
-              <b>Upload an Excel file</b>
-              <div className={isSubmitting_add ? 'submitting' : ''}>
-
-                <form onSubmit={handleAddData}>
-                  <input type="file" id="myFileInput" onClick={onFileInputClick} onChange={handleFileChange} />
-                  Data Name: <input type="text" id='new_data_name' defaultValue={newDataName} onChange={handleNewDataNameChange} />
-                  <button type="submit" disabled={isSubmitting_add}>{isSubmitting_add ? 'Processing...(may take a few minutes)' : 'Add Data'}</button>
-
-
-                </form>
-              </div>
-              <br></br>
-              <button onClick={handleRemoveSelectedItems}>Remove Selected Data</button>
-
-
-
-            </td>
-
-
-          </tr>
-          <tr>
-
-            <td>
-
-
-              <ul>
-                {projects.map((item, index) => (
-                  <li
-                    key={item}
-                    onClick={() => handleSelectItem(item)}
-                    style={{
-                      backgroundColor: selectedProjects.includes(item)
-                        ? 'lightblue'
-                        : 'transparent',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </td>
-
-          </tr>
-        </tbody>
-      </table>
-
-
-
-
-      <h3>Contents in the selected data</h3>
-
-      <p>{preprocessSummary.replace("/\n/g", "<br />")}</p>
-<h3>Significant Regions</h3>
-
-      <form onSubmit={handleGenerate}>
-        <table>
+      <div>
+        <h3>Data uploaded in the server </h3>
+        <table border='true'>
           <thead></thead>
           <tbody>
             <tr>
-              <td>
-                P-value : <input type="number" onChange={handlePvalueChange} name='pvalue' style={{ width: "50px" }} value={pvalue} />
+               <td width='80%'>
+
+
+                <ul>
+                  {projects.map((item, index) => (
+                    <li
+                      key={item}
+                      onClick={() => handleSelectItem(item)}
+                      style={{
+                        backgroundColor: selectedProjects.includes(item)
+                          ? 'lightblue'
+                          : 'transparent',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </td>
+              <td rowSpan='2'>
+                <b>Upload an Excel file</b>
+                <div className={isSubmitting_add ? 'submitting' : ''}>
+
+                  <form onSubmit={handleAddData}>
+                    <input type="file" id="myFileInput" onClick={onFileInputClick} onChange={handleFileChange} />
+                    Data Name: <input type="text" id='new_data_name' defaultValue={newDataName} onChange={handleNewDataNameChange} />
+                    <button type="submit" disabled={isSubmitting_add}>{isSubmitting_add ? 'Processing...(may take a few minutes)' : 'Add Data'}</button>
+
+
+                  </form>
+                </div>
+                <br></br>
+                <button onClick={handleRemoveSelectedItems}>Remove Selected Data</button>
+
+
 
               </td>
-              <td>
-                Fold EXP/VEH (up) : <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
 
-              </td>
-              <td>
-                Fold EXP/VEH (down) : <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
-
-              </td>
 
             </tr>
-
+            
           </tbody>
         </table>
-        <button type="submit" onClick={() => setAnalysisMode('list')} disabled={isSubmitting_analysis_list}>{isSubmitting_analysis_list ? 'Processing...(may take a few seconds)' : 'Region List Only'}</button> &nbsp;&nbsp;
-        <button type="submit" onClick={() => setAnalysisMode('both')} disabled={isSubmitting_analysis_both}>{isSubmitting_analysis_both ? 'Processing...(may take a few minutes)' : 'Region List & Heatmap (may take a few miniutes)'}</button>
+      </div>
+      <div className="collapsible-header" onClick={toggleVisibility_basic}>
+        <span><b>Basic Statistics</b></span>
+        <span className={`arrow ${isVisible_basic ? 'up' : 'down'}`}>
+          {isVisible_basic ? '▲' : '▼'}
+        </span>
+      </div>
+
+      <div className={`collapsible-content ${isVisible_basic ? 'open' : ''}`}>
+        
+
+        
+        <p>
+        {preprocessSummary && 
+          (Object.keys(preprocessSummary).map((key) => (
+          <div key={key}>
+            <strong>{key}:</strong> {preprocessSummary[key]}
+          </div>
+          )
+        ))
+        
+        }
+      </p>
+ <div style={{'border-style': 'solid','border-width': '2px', 'border-color': 'black'}}>
+        <TransformWrapper
+          defaultScale={1}
+          defaultPositionX={200}
+          defaultPositionY={100}
+        >
+
+          {({ zoomIn, zoomOut, resetTransform, positionX, positionY, ...rest }) => (
+            <>
+              <Controls />
+
+              <TransformComponent >
+                <img
+                  src={`data:image/jpeg;base64,${imageBasicStat}`}
+                  //src="https://cdn.sstatic.net/Img/unified/sprites.svg?v=e5e58ae7df45"
+                  width='100%'
+                  alt="A data heatmap will be shown here" />
+              </TransformComponent>
+            </>
+          )}
+        </TransformWrapper>
+        </div>
+
+        <hr></hr>
+      </div>
+
+     <div className="collapsible-header" onClick={toggleVisibility_brainheatmap}>
+        <span><b>Brain Heatmaps</b></span>
+        <span className={`arrow ${isVisible_brainheatmap ? 'up' : 'down'}`}>
+          {isVisible_brainheatmap? '▲' : '▼'}
+        </span>
+      </div>
+
+      <div className={`collapsible-content ${isVisible_brainheatmap ? 'open' : ''}`}>
+      
+        <form >
+          <table border = '1px'>
+            <thead></thead>
+            <tbody>
+              <tr padding='20px'>
+                <td  padding='20px'>
+                Fold(EXP/VEH) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
+                  &nbsp; in green
+                </td>
+                <td  padding='20px'>
+                  Fold(EXP/VEH) &#8804; <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
+                  &nbsp; in red
+                </td>
+                <td  padding='20px'>
+                  P-value &#8804; <input type="number" onChange={handlePvalueChange} name='pvalue' style={{ width: "50px" }} value={pvalue} />
+
+                </td>
+
+              </tr>
+
+            </tbody>
+          </table>
+  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
+    {color_basic &&
+      color_basic.map((item, index) => {
+        return (
+          <><input  style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}  
+          checked={checkedColors.includes(item)}
+          onChange={handleCheckboxColorsChange}></input>
+                  <label  style={{ cursor: isLoading ? 'wait' : 'default' }}  htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
+        );
+      })}
+  </div>
+
+  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
+    {color_minus &&
+      color_minus.map((item, index) => {
+        return (
+          <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+          checked={checkedColors.includes(item)}
+          onChange={handleCheckboxColorsChange}
+          ></input>
+                  <label   style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
+        );
+      })}
+  </div>
+
+
+  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
+    {color_fraction &&
+      color_fraction.map((item, index) => {
+        return (
+          <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+            checked={checkedColors.includes(item)}
+          onChange={handleCheckboxColorsChange}
+          ></input>
+                  <label   style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
+        );
+      })}
+  </div>
+
+  <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={"ALL"} name={"ALL"} value={"ALL"}
+            checked={checkedColors.includes("ALL")}
+          onChange={handleCheckboxColorsChange}
+          ></input>
+                  <label   style={{ cursor: isLoading ? 'wait' : 'default', 'font-weight':'bold' }} htmlFor={"ALL"}>{"ALL"}</label>&nbsp;&nbsp;&nbsp;</>
+
+  {isAllDownlodButtonVisible && <a href={downloadLink}  >ALL(download)</a>}<br></br>
+              <i>For new threshold settings, it takes time to generate a heatmap for these thresholds.</i><br></br>
+
       </form>
 
-<a href={downloadLink}  disabled="disabled">download</a>
-<hr></hr>
+        <br></br>
 
-      <h3>Brain heatmap</h3>
-<i>Some regions has not been visualized that are not matched to Brain Atlas.</i><br></br>
+        <div style={{'border-style': 'solid','border-width': '2px', 'border-color': 'black'}}>
+        <TransformWrapper
+          defaultScale={1}
+          defaultPositionX={200}
+          defaultPositionY={100}
+        >
+
+          {({ zoomIn, zoomOut, resetTransform, positionX, positionY, ...rest }) => (
+            <>
+              <Controls />
+
+              <TransformComponent >
+                <img
+                  src={`data:image/jpeg;base64,${imageData}`}
+                  //src="https://cdn.sstatic.net/Img/unified/sprites.svg?v=e5e58ae7df45"
+                  width='100%'
+                  alt="A brain heatmap will be shown here" />
+              </TransformComponent>
+            </>
+          )}
+        </TransformWrapper>
+        </div>
+        <i>- You can use the mouse wheel to zoom in or out of the image.</i><br></br>
+              <i>- Some regions has not been visualized that are not matched to <a target='_blank' href='https://www.sciencedirect.com/science/article/pii/S0092867420304025?via%3Dihub'>Allen Mouse Brain</a></i><br></br>
+    <h3>Regions shown in the brain heatmap</h3>
+        
+        <>{significantRegions && <Table  columns={columns} data={significantRegions} setSelectedRows={setSelectedSignificantRegionRows} />}</>
+
+      </div>
+
+      <hr></hr>
+
+      
 
       <br></br>
 
@@ -492,30 +702,34 @@ const columnHelper = createColumnHelper<Show>();
 
 
 
-      <TransformWrapper
-        defaultScale={1}
-        defaultPositionX={200}
-        defaultPositionY={100}
-      >
 
-        {({ zoomIn, zoomOut, resetTransform, positionX, positionY, ...rest }) => (
-          <>
-            <Controls />
-
-            <TransformComponent >
-              <img
-                src={`data:image/jpeg;base64,${imageData}`}
-                //src="https://cdn.sstatic.net/Img/unified/sprites.svg?v=e5e58ae7df45"
-                width='100%'
-                alt="brain heatmap will be shown here" />
-            </TransformComponent>
-          </>
-        )}
-      </TransformWrapper>
 
     </div>
 
   );
+}
+
+function IndeterminateCheckbox({
+  indeterminate,
+  className = '',
+  ...rest
+}: { indeterminate?: boolean } & HTMLProps<HTMLInputElement>) {
+  const ref = useRef<HTMLInputElement>(null!)
+
+  useEffect(() => {
+    if (typeof indeterminate === 'boolean') {
+      ref.current.indeterminate = !rest.checked && indeterminate
+    }
+  }, [ref, indeterminate])
+
+  return (
+    <input
+      type="checkbox"
+      ref={ref}
+      className={className + ' cursor-pointer'}
+      {...rest}
+    />
+  )
 }
 
 export default App;
