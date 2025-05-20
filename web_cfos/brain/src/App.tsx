@@ -420,7 +420,7 @@ function App() {
         }
         else {
 
-          //setImageData(data.image)
+          setImageData(data.image)
           setSignificantRegions(data.df);
         }
       } catch (error) {
