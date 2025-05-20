@@ -262,6 +262,45 @@ def load_object(output_dir):
 
     return cfos, df_fold, df_fdr_permutation_test, df_fdr_t_test
 #df_sig_region_fold = None
+@app.route('/downloadall', methods=['POST'])
+def downloadall():
+    print('downloadall')
+    pvalue_th = float(request.form.get('pvalue'))
+    fold_up = float(request.form.get('fold_up'))
+    fold_down = float(request.form.get('fold_down'))
+    output_dir = request.form.get('dataname')
+
+    print(pvalue_th,fold_up,fold_down,output_dir)
+    _filename_from_params = filename_from_params(pvalue_th, fold_up, fold_down)
+    temp_dir = DATA_FOLDER+"/"+output_dir+"/"+_filename_from_params
+
+
+    sta = time.time() # 시간 측정
+
+    txtfiles = []
+    for file in glob.glob(temp_dir+"/heatmap*"):
+        txtfiles.append(file)
+    memory_file = io.BytesIO()
+    zip_file_name = f"files/{str(sta)}_{output_dir}_{_filename_from_params}.zip"
+    with zipfile.ZipFile(memory_file, 'w') as myzip:
+    # Add files to the archive
+        for t in txtfiles:
+            myzip.write(t,arcname=t.replace(temp_dir,""))
+    memory_file.seek(0)
+    with open(zip_file_name, 'wb') as file:
+        file.write(memory_file.read())
+    memory_file.seek(0)
+    eta = time.time() # 시간 측정
+    print('zip:',eta-sta)
+    hostname = request.headers.get('Host')
+    print(zip_file_name)
+    if zip_file_name:   
+        #secure_filename = secure_filename(f'{str(sta)}_{output_dir}_{_filename_from_params}.zip')
+        #uploads_dir = os.path.join(app.root_path, 'files')
+        return send_file(memory_file,mimetype='application/zip',  download_name=f'{output_dir}_{_filename_from_params}.zip',as_attachment=True)
+
+        #return send_from_directory(uploads_dir, secure_filename, as_attachment=True)
+    
 @app.route('/brainheatmap', methods=['POST'])
 def brainheatmap():
     #sema.acquire() # 세마포어 획득
@@ -338,33 +377,7 @@ def brainheatmap():
             #'elapsed_time': eta - sta
         }
         return jsonify(response)
-    elif color == 'ALL':
-        sta = time.time() # 시간 측정
-
-        txtfiles = []
-        for file in glob.glob(temp_dir+"/heatmap*"):
-            txtfiles.append(file)
-        memory_file = io.BytesIO()
-        zip_file_name = f"files/{str(sta)}_{output_dir}_{_filename_from_params}.zip"
-        with zipfile.ZipFile(memory_file, 'w') as myzip:
-        # Add files to the archive
-            for t in txtfiles:
-                myzip.write(t,arcname=t.replace(temp_dir,""))
-        memory_file.seek(0)
-        with open(zip_file_name, 'wb') as file:
-            file.write(memory_file.read())
-        memory_file.seek(0)
-        eta = time.time() # 시간 측정
-        print('zip:',eta-sta)
-        hostname = request.headers.get('Host')
-        #port = request.headers.get('Port')
-        #encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
-        response = {
-            'df':df_sig_region_fold.to_dict(orient='records'),
-            'zip':f'http://{hostname}/download/{str(sta)}_{output_dir}_{_filename_from_params}.zip',
-            #'elapsed_time': eta - sta
-        }
-        return jsonify(response)
+    
     #heatmap_{color_code.replace("/","_")}.png
     df_sig_region_fold = df_sig_region_fold.query(f'color=="{color}"')
     output_img_filename = f'{temp_dir}/heatmap_{color.replace("/","_").replace(" ","_")}_{_filename_from_params}.png'

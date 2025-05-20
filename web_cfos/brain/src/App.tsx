@@ -5,6 +5,7 @@ import Table, { Show } from './Test.tsx';
 import axios from "axios";
 import { saveAs } from 'file-saver';
 import './App.css'
+import { downloadAsync, documentDirectory} from 'expo-file-system';
 
 const Toolbox = {
   display: "flex",
@@ -39,7 +40,7 @@ function App() {
   const [pvalue_cur, setPvalue_cur] = useState(0.05);
   const [foldup_cur, setFoldup_cur] = useState(1.5);
   const [folddown_cur, setFolddown_cur] = useState(0.67);
-  const [isAllDownlodButtonVisible, setIsAllDownlodButtonVisible] = useState(false);
+  const [isAllDownlodButtonVisible, setIsAllDownlodButtonVisible] = useState(true);
 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSignificantRegionRows, setSelectedSignificantRegionRows] = useState([]);
@@ -465,6 +466,60 @@ function App() {
     setIsLoading(false)
   }
 
+  const handleAllDownload = async (event) => {
+    event.preventDefault();
+    if (selectedProjects.length == 0) {
+
+      alert("please select a data")
+      return
+    }
+    console.log(event.target)
+    console.log(event.target.checked)
+    console.log(checkedColors)
+    setIsLoading(true)
+    setCheckedColors([]);
+    
+    
+
+    const formData = new FormData();
+    formData.append('pvalue', pvalue)
+    formData.append('fold_up', foldup)
+    formData.append('fold_down', folddown)
+    formData.append('dataname', selectedProjects[0])
+
+
+
+    try {
+      const response = await fetch('/downloadall', {
+        method: 'POST',
+        responseType: 'blob',
+        body: formData
+      });
+      //const { uri: localUri } = await downloadAsync('http://192.168.0.12:5000/video.mp4', documentDirectory + 'video.mp4');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob)
+      //document.location = url
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'heatmaps.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+
+    } catch (error) {
+      console.error('request failed', error);
+    }
+    finally {
+      setIsLoading(false)
+
+    }
+
+
+
+  }
   const handleUpdateParams = async (event) => {
     event.preventDefault();
     if (selectedProjects.length == 0) {
@@ -744,14 +799,12 @@ function App() {
                   <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_fraction[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_fraction[item]['down']}</span>)</span> &nbsp;&nbsp;&nbsp;</>
               ))}
                       <br></br>
-          <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={"ALL"} name={"ALL"} value={"ALL"}
-            checked={checkedColors.includes("ALL")}
-            onChange={handleCheckboxColorsChange}
-          ></input>
-            <label style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={"ALL"}>{"ALL"}</label>&nbsp;&nbsp;&nbsp;</>
+          <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"ALL"} name={"ALL"} value={"Download All Heatmaps"}
+            onClick={handleAllDownload}></input>
+            </>
 
-          {isAllDownlodButtonVisible && <a href={downloadLink}  >ALL(download)</a>}<br></br>
-          </div>
+          
+                    </div>
 
           <i>For new threshold settings, it takes time to generate a heatmap for these thresholds.</i><br></br>
 
