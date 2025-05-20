@@ -73,9 +73,9 @@ class Cfos():
             #filename = 'resources/SST_PV_cfos_Summary_Jin_Mehdi_March25 (1).xlsx'
             wb = load_workbook(filename)
             for sheet in wb.worksheets:
-                if 'VEH' in sheet.title:        
+                if 'VEH_DeMBAmaps' in sheet.title:        
                     self.df_exp = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
-                elif 'EXP' in sheet.title:
+                elif 'EXP_DeMBAmaps' in sheet.title:
                     self.df_veh = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
             wb.close()
 
