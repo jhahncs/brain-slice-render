@@ -37,6 +37,21 @@ tfoot {
   color: gray;
 }
 
+.overlay {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.5); /* Optional background with transparency */
+    z-index: 1000;
+    cursor: wait;
+}
+
+.container {
+    position: relative;
+}
+
 tfoot th {
   font-weight: normal;
 }
@@ -86,6 +101,11 @@ tfoot th {
 .App-logo {
   height: 40vmin;
   pointer-events: none;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -6,7 +6,7 @@ import {
   Column,
 } from "@tanstack/react-table";
 import { ColumnFiltersState, getFilteredRowModel, getPaginationRowModel, RowSelectionState, SortingState, getSortedRowModel, ColumnResizeMode, ColumnResizeDirection } from "@tanstack/react-table";
-import { useState, useEffect, useMemo, useRef, HTMLProps } from 'react'
+import { useState, useEffect, InputHTMLAttributes, useMemo, useRef, HTMLProps } from 'react'
 
 
 export type Show = {
@@ -35,7 +35,7 @@ type TableProps<TData> = {
 };
 
 
-function Table({ columns, data,setSelectedRows }: TableProps<Show>) {
+function Table({ columns, data, setSelectedRows }: TableProps<Show>) {
   //use the useReact table Hook to build our table:
 const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 const [sorting, setSorting] = useState<SortingState>([]);
@@ -48,8 +48,8 @@ const table = useReactTable({
     //pass in our data
     data,
     columns,
-    columnResizeMode, //specify that we'll use resizing in this table
-    columnResizeDirection,
+    //columnResizeMode, //specify that we'll use resizing in this table
+    //columnResizeDirection,
     debugTable: true,
     debugHeaders: true,
     debugColumns: true,
@@ -77,10 +77,12 @@ const table = useReactTable({
   
   // Table component logic and UI come here
   return (
-    <div style={{ direction: table.options.columnResizeDirection }}>
-      <table {...{
+    <div className="p-2 block max-w-full overflow-x-scroll overflow-y-hidden" style={{ direction: table.options.columnResizeDirection }}>
+      <div className="h-2" />
+      <table  className="w-full " {...{
         style: {
-          width: table.getCenterTotalSize(),
+          //width: table.getCenterTotalSize(),
+          width: '100%'
         },
       }}>
         <thead>
@@ -285,7 +287,7 @@ const table = useReactTable({
       </div>
       <br />
 
-
+<div className="h-2" />
 
     </div>
 
@@ -340,7 +342,7 @@ function Searchbar({
 
   value: string | number;
   onChange: (value: string | number) => void;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "onChange">) {
   const [value, setValue] = useState(initialValue);
   useEffect(() => {
     setValue(initialValue);

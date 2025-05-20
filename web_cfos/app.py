@@ -282,7 +282,7 @@ def brainheatmap():
         return jsonify(response)
     
 
-    print(pvalue_th,fold_up,fold_down,output_dir)
+    print(pvalue_th,fold_up,fold_down,color,output_dir)
     _filename_from_params = filename_from_params(pvalue_th, fold_up, fold_down)
     temp_dir = DATA_FOLDER+"/"+output_dir+"/"+_filename_from_params
 
@@ -317,13 +317,28 @@ def brainheatmap():
    
     else:
         df_sig_region_fold = pd.read_csv(f'{temp_dir}/heatmap_significant_regions_{_filename_from_params}.csv')
+        with open(f'{temp_dir}/color_2_dict_up_{_filename_from_params}.json', 'r') as f:
+            color_2_dict_up = json.load(f)
+        with open(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json', 'r') as f:
+            color_2_dict_down = json.load(f)
 
 
 
+    if color == 'UPDATE':
+        color_2_updown = {}
+        for k in color_2_dict_up:
+            color_2_updown[k] = {}
+            color_2_updown[k]['up'] = len(color_2_dict_up[k])
+            color_2_updown[k]['down'] = len(color_2_dict_down[k])
+        
 
-
-
-    if color == 'ALL':
+        response = {
+            'df':df_sig_region_fold.to_dict(orient='records'),
+            'freq':color_2_updown,
+            #'elapsed_time': eta - sta
+        }
+        return jsonify(response)
+    elif color == 'ALL':
         sta = time.time() # 시간 측정
 
         txtfiles = []
@@ -358,14 +373,15 @@ def brainheatmap():
     #gen_brain_heatmap(DATA_FOLDER+"/"+output_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
     #print('end')
     sta = time.time() # 시간 측정
-
+    '''
     img = Image.open(output_img_filename)
     byte_arr = io.BytesIO()
     img.save(byte_arr,  format='PNG')
     encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
+    '''
     response = {
         'message': f'{pvalue_th} {fold_up} {fold_down}',
-        'image': encoded_image,
+        #'image': encoded_image,
         'df':df_sig_region_fold.to_dict(orient='records'),
         #'elapsed_time': eta - sta
     }

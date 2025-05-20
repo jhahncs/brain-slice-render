@@ -32,10 +32,14 @@ function sanitizeFolderName(name) {
 
 
 function App() {
+
   const [pvalue, setPvalue] = useState(0.05);
   const [foldup, setFoldup] = useState(1.5);
   const [folddown, setFolddown] = useState(0.67);
-    const [isAllDownlodButtonVisible, setIsAllDownlodButtonVisible] = useState(false);
+  const [pvalue_cur, setPvalue_cur] = useState(0.05);
+  const [foldup_cur, setFoldup_cur] = useState(1.5);
+  const [folddown_cur, setFolddown_cur] = useState(0.67);
+  const [isAllDownlodButtonVisible, setIsAllDownlodButtonVisible] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSignificantRegionRows, setSelectedSignificantRegionRows] = useState([]);
@@ -53,7 +57,9 @@ function App() {
   const [isFirstRender, setIsFirstRender] = useState(true); // Using useRef to track initial render
   const [downloadLink, setDownloadLink] = useState('');
   const [analysisMode, setAnalysisMode] = useState(null);
-const [checkedColors, setCheckedColors] = useState([]);
+  const [checkedColors, setCheckedColors] = useState([]);
+  const paramsInputDiv = useRef(null);
+        const [isVisible_paramsInputDiv, setIsVisible_paramsInputDiv] = useState(false);
 
 
   const onFileInputClick = (event) => {
@@ -218,7 +224,7 @@ const [checkedColors, setCheckedColors] = useState([]);
   const handleSelectItem = async (index) => {
 
     setIsLoading(true)
-    setPreprocessSummary({'processing..':""});
+    setPreprocessSummary({ 'processing..': "" });
     console.log('handleSelectItem')
     console.log(index)
 
@@ -239,7 +245,7 @@ const [checkedColors, setCheckedColors] = useState([]);
       });
 
       const data = await response.json();
-     //setProjects([...projects, newDataName]);
+      //setProjects([...projects, newDataName]);
       //alert("Successfully removed:"+data['message']);
       console.log(data['message'])
       setPreprocessSummary(data['message']);
@@ -249,7 +255,7 @@ const [checkedColors, setCheckedColors] = useState([]);
 
     }
     finally {
-    setIsLoading(false)
+      setIsLoading(false)
 
 
     }
@@ -313,7 +319,7 @@ const [checkedColors, setCheckedColors] = useState([]);
           />
         ),
         cell: ({ row }) => (
-          <div className="px-1">
+          <div >
             <IndeterminateCheckbox
               {...{
                 checked: row.getIsSelected(),
@@ -329,22 +335,23 @@ const [checkedColors, setCheckedColors] = useState([]);
       columnHelper.accessor("TG number", {
         header: "TG number",
         cell: (info) => info.getValue(),
-        enableResizing: true, //disable resizing for just this column
-
+        size:'5%'
       }),
-            columnHelper.accessor("Region Name", {
+      columnHelper.accessor("Region Name", {
         header: "Region Name",
         cell: (info) => info.getValue(),
+        size:'70%'
       }),
-            columnHelper.accessor("fold", {
+      columnHelper.accessor("fold", {
         header: "fold",
-        cell: (info) => parseFloat(info.getValue().toFixed(2)),
+        cell: (info) => parseFloat(info.getValue().toFixed(3)),
         enableColumnFilter: false,
-
+        size:'10%'
       }),
       columnHelper.accessor("Region ID", {
         header: "Region ID",
         cell: (info) => info.getValue(),
+        size:'5%'
       }),
       /*
       columnHelper.accessor("color", {
@@ -382,7 +389,7 @@ const [checkedColors, setCheckedColors] = useState([]);
       setImageData(null)
       setSignificantRegions(null);
       setIsAllDownlodButtonVisible(false)
-      if(checkedColors.length == 0)
+      if (checkedColors.length == 0)
         return
 
       setIsLoading(true)
@@ -407,25 +414,24 @@ const [checkedColors, setCheckedColors] = useState([]);
         });
 
         const data = await response.json();
-        if (checkedColors[0] == 'ALL')
-        {
+        if (checkedColors[0] == 'ALL') {
           setIsAllDownlodButtonVisible(true)
           setDownloadLink(data.zip)
         }
-        else{
+        else {
 
-          setImageData(data.image)
+          //setImageData(data.image)
           setSignificantRegions(data.df);
         }
       } catch (error) {
         console.error('업로드 실패', error);
       }
       finally {
-      setIsLoading(false)
+        setIsLoading(false)
 
       }
     }
-    
+
 
     fetchBrainheatmap()
 
@@ -437,7 +443,7 @@ const [checkedColors, setCheckedColors] = useState([]);
 
   const handleCheckboxColorsChange = (event) => {
     event.preventDefault();
-     if (selectedProjects.length == 0) {
+    if (selectedProjects.length == 0) {
 
       alert("please select a data")
       return
@@ -448,11 +454,10 @@ const [checkedColors, setCheckedColors] = useState([]);
     setIsLoading(true)
     const itemValue = event.target.value;
     const isChecked = event.target.checked;
-
     if (isChecked) {
       //setCheckedColors([...checkedColors, itemValue]);
       setCheckedColors([itemValue]);
-      
+
     } else {
       //setCheckedColors(checkedColors.filter((item) => item !== itemValue));
       setCheckedColors([]);
@@ -460,25 +465,113 @@ const [checkedColors, setCheckedColors] = useState([]);
     setIsLoading(false)
   }
 
+  const handleUpdateParams = async (event) => {
+    event.preventDefault();
+    if (selectedProjects.length == 0) {
 
- const color_basic = [ 'SST','PV','cfos', 'cfos total' ];
- const color_minus = [ 'SST-PV-cfos', 'SST-cfos',    'PV-cfos', 'SST-PV', ];
-const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos fraction'];
+      alert("please select a data")
+      return
+    }
+    setCheckedColors([]);
+    setIsVisible_paramsInputDiv(false);
+    setImageData(null)
+    setSignificantRegions(null);
+    setIsAllDownlodButtonVisible(false)
+
+    setIsLoading(true)
+    setColor_basic(color_basic_const)
+    setColor_minus(color_minus_const)
+    setColor_fraction(color_fraction_const)
+
+    const formData = new FormData();
+    formData.append('pvalue', pvalue)
+    formData.append('fold_up', foldup)
+    formData.append('fold_down', folddown)
+    //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
+    formData.append('color', "UPDATE")
+    formData.append('dataname', selectedProjects[0])
+
+
+
+    try {
+      const response = await fetch('/brainheatmap', {
+        method: 'POST',
+        'Content-Type': 'multipart/form-data',
+        body: formData
+      });
+      let temp_color_basic = {}
+      let temp_color_minus = {}
+      let temp_color_fraction = {}
+      const data = await response.json();
+      for (const color in data['freq']) {
+        if (color in color_basic) {
+          temp_color_basic[color] = data['freq'][color]
+        }
+        else if (color in color_minus) {
+          temp_color_minus[color] = data['freq'][color]
+        }
+        else if (color in color_fraction) {
+          temp_color_fraction[color] = data['freq'][color]
+        }
+
+      }
+      setColor_basic(temp_color_basic)
+      setColor_minus(temp_color_minus)
+      setColor_fraction(temp_color_fraction)
+
+      setFoldup_cur(foldup)
+      setFolddown_cur(folddown)
+      setPvalue_cur(pvalue)
+          setIsVisible_paramsInputDiv(true);
+
+    } catch (error) {
+      console.error('업로드 실패', error);
+    }
+    finally {
+      setIsLoading(false)
+
+    }
+  };
+
+
+  const color_basic_const = { 'SST': { 'up': 0, 'down': 0 }, 'PV': { 'up': 0, 'down': 0 }, 'cfos': { 'up': 0, 'down': 0 }, 'cfos total': { 'up': 0, 'down': 0 } }
+  const color_minus_const = { 'SST-PV-cfos': { 'up': 0, 'down': 0 }, 'SST-cfos': { 'up': 0, 'down': 0 }, 'PV-cfos': { 'up': 0, 'down': 0 }, 'SST-PV': { 'up': 0, 'down': 0 } }
+  const color_fraction_const = { 'SST-PV/cfos fraction': { 'up': 0, 'down': 0 }, 'SST/cfos fraction': { 'up': 0, 'down': 0 }, 'PV/cfos fraction': { 'up': 0, 'down': 0 } }
+  const [color_basic, setColor_basic] = useState(color_basic_const);
+  const [color_minus, setColor_minus] = useState(color_minus_const);
+  const [color_fraction, setColor_fraction] = useState(color_fraction_const);
+
   const [isVisible_basic, setIsVisible_basic] = useState(false);
 
   const toggleVisibility_basic = () => {
     setIsVisible_basic(!isVisible_basic);
   };
+  const [isVisible_foldchange, setIsVisible_foldchange] = useState(true);
+
+  const toggleVisibility_foldchange = () => {
+    setIsVisible_foldchange(!isVisible_foldchange);
+  };
+
   const [isVisible_brainheatmap, setIsVisible_brainheatmap] = useState(true);
 
   const toggleVisibility_brainheatmap = () => {
     setIsVisible_brainheatmap(!isVisible_brainheatmap);
   };
 
-  
+
+  const [isVisible_significantregion, setIsVisible_significantregion] = useState(true);
+
+  const toggleVisibility_significantregion = () => {
+    setIsVisible_significantregion(!isVisible_significantregion);
+  };
+
+  const upArrowUnicode = '\u2191';
+  const downArrowUnicode = '\u2193';
+
   return (
 
     <div style={{ cursor: isLoading ? 'wait' : 'default' }}>
+      {isLoading && <div className="overlay"></div>}
 
       <div>
         <h3>Data uploaded in the server </h3>
@@ -486,7 +579,7 @@ const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos f
           <thead></thead>
           <tbody>
             <tr>
-               <td width='80%'>
+              <td width='80%'>
 
 
                 <ul>
@@ -527,7 +620,7 @@ const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos f
 
 
             </tr>
-            
+
           </tbody>
         </table>
       </div>
@@ -539,130 +632,144 @@ const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos f
       </div>
 
       <div className={`collapsible-content ${isVisible_basic ? 'open' : ''}`}>
-        
 
-        
+
+
         <p>
-        {preprocessSummary && 
-          (Object.keys(preprocessSummary).map((key) => (
-          <div key={key}>
-            <strong>{key}:</strong> {preprocessSummary[key]}
-          </div>
-          )
-        ))
-        
-        }
-      </p>
- <div style={{'border-style': 'solid','border-width': '2px', 'border-color': 'black'}}>
-        <TransformWrapper
-          defaultScale={1}
-          defaultPositionX={200}
-          defaultPositionY={100}
-        >
+          {preprocessSummary &&
+            (Object.keys(preprocessSummary).map((key) => (
+              <div key={key}>
+                <strong>{key}:</strong> {preprocessSummary[key]}
+              </div>
+            )
+            ))
 
-          {({ zoomIn, zoomOut, resetTransform, positionX, positionY, ...rest }) => (
-            <>
-              <Controls />
+          }
+        </p>
+        <div style={{ 'border-style': 'solid', 'border-width': '2px', 'border-color': 'black' }}>
+          <TransformWrapper
+            defaultScale={1}
+            defaultPositionX={200}
+            defaultPositionY={100}
+          >
 
-              <TransformComponent >
-                <img
-                  src={`data:image/jpeg;base64,${imageBasicStat}`}
-                  //src="https://cdn.sstatic.net/Img/unified/sprites.svg?v=e5e58ae7df45"
-                  width='100%'
-                  alt="A data heatmap will be shown here" />
-              </TransformComponent>
-            </>
-          )}
-        </TransformWrapper>
+            {({ zoomIn, zoomOut, resetTransform, positionX, positionY, ...rest }) => (
+              <>
+                <Controls />
+
+                <TransformComponent >
+                  <img
+                    src={`data:image/jpeg;base64,${imageBasicStat}`}
+                    //src="https://cdn.sstatic.net/Img/unified/sprites.svg?v=e5e58ae7df45"
+                    width='100%'
+                    alt="A data heatmap will be shown here" />
+                </TransformComponent>
+              </>
+            )}
+          </TransformWrapper>
         </div>
 
         <hr></hr>
       </div>
 
-     <div className="collapsible-header" onClick={toggleVisibility_brainheatmap}>
-        <span><b>Brain Heatmaps</b></span>
-        <span className={`arrow ${isVisible_brainheatmap ? 'up' : 'down'}`}>
-          {isVisible_brainheatmap? '▲' : '▼'}
+      <div className="collapsible-header" onClick={toggleVisibility_foldchange}>
+        <span><b>Fold Change(EXP/VEH)</b></span>
+        <span className={`arrow ${isVisible_foldchange ? 'up' : 'down'}`}>
+          {isVisible_foldchange ? '▲' : '▼'}
         </span>
       </div>
 
-      <div className={`collapsible-content ${isVisible_brainheatmap ? 'open' : ''}`}>
-      
+      <div className={`collapsible-content ${isVisible_foldchange ? 'open' : ''}`}>
+
         <form >
-          <table border = '1px'>
+          <table border='1px'>
             <thead></thead>
             <tbody>
               <tr padding='20px'>
-                <td  padding='20px'>
-                Fold(EXP/VEH) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
+                <td padding='20px'>
+                  Fold(EXP/VEH) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
                   &nbsp; in green
                 </td>
-                <td  padding='20px'>
+                <td padding='20px'>
                   Fold(EXP/VEH) &#8804; <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
                   &nbsp; in red
                 </td>
-                <td  padding='20px'>
+                <td padding='20px'>
                   P-value &#8804; <input type="number" onChange={handlePvalueChange} name='pvalue' style={{ width: "50px" }} value={pvalue} />
 
                 </td>
+                <td>
 
+                  <input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"UPDATE"} name={"UPDATE"} value={"UPDATE"}
+                    onClick={handleUpdateParams}
+                  ></input>
+
+
+                </td>
               </tr>
+              
 
             </tbody>
           </table>
-  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
-    {color_basic &&
-      color_basic.map((item, index) => {
-        return (
-          <><input  style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}  
-          checked={checkedColors.includes(item)}
-          onChange={handleCheckboxColorsChange}></input>
-                  <label  style={{ cursor: isLoading ? 'wait' : 'default' }}  htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
-        );
-      })}
-  </div>
+          
 
-  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
-    {color_minus &&
-      color_minus.map((item, index) => {
-        return (
-          <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
-          checked={checkedColors.includes(item)}
-          onChange={handleCheckboxColorsChange}
-          ></input>
-                  <label   style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
-        );
-      })}
-  </div>
+          <div ref={paramsInputDiv} style={{ cursor: isLoading ? 'wait' : 'default',  display: isVisible_paramsInputDiv ? 'block' : 'none' }}>
+            <br></br>
+            <div>Current parameters settings: fold up = {foldup_cur}, fold down = {folddown_cur}, pvalue = {pvalue_cur}</div>
 
+            {color_basic &&
+              Object.keys(color_basic).map(item => (
 
-  <div  style={{ cursor: isLoading ? 'wait' : 'default' }}>
-    {color_fraction &&
-      color_fraction.map((item, index) => {
-        return (
-          <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
-            checked={checkedColors.includes(item)}
-          onChange={handleCheckboxColorsChange}
-          ></input>
-                  <label   style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={item}>{item}</label>&nbsp;&nbsp;&nbsp;</>
-        );
-      })}
-  </div>
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                  checked={checkedColors.includes(item)}
+                  onChange={handleCheckboxColorsChange}></input>
+                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item}  ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_basic[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_basic[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
+              ))}
+            <br></br>
+            {color_minus &&
+              Object.keys(color_minus).map(item => (
 
-  <><input   style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={"ALL"} name={"ALL"} value={"ALL"}
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                  checked={checkedColors.includes(item)}
+                  onChange={handleCheckboxColorsChange}></input>
+                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_minus[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_minus[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
+              ))}
+                     <br></br>
+            {color_fraction &&
+              Object.keys(color_fraction).map(item => (
+
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                  checked={checkedColors.includes(item)}
+                  onChange={handleCheckboxColorsChange}></input>
+                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_fraction[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_fraction[item]['down']}</span>)</span> &nbsp;&nbsp;&nbsp;</>
+              ))}
+                      <br></br>
+          <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={"ALL"} name={"ALL"} value={"ALL"}
             checked={checkedColors.includes("ALL")}
-          onChange={handleCheckboxColorsChange}
+            onChange={handleCheckboxColorsChange}
           ></input>
-                  <label   style={{ cursor: isLoading ? 'wait' : 'default', 'font-weight':'bold' }} htmlFor={"ALL"}>{"ALL"}</label>&nbsp;&nbsp;&nbsp;</>
+            <label style={{ cursor: isLoading ? 'wait' : 'default' }} htmlFor={"ALL"}>{"ALL"}</label>&nbsp;&nbsp;&nbsp;</>
 
-  {isAllDownlodButtonVisible && <a href={downloadLink}  >ALL(download)</a>}<br></br>
-              <i>For new threshold settings, it takes time to generate a heatmap for these thresholds.</i><br></br>
+          {isAllDownlodButtonVisible && <a href={downloadLink}  >ALL(download)</a>}<br></br>
+          </div>
 
-      </form>
+          <i>For new threshold settings, it takes time to generate a heatmap for these thresholds.</i><br></br>
+
+        </form>
 
         <br></br>
 
-        <div style={{'border-style': 'solid','border-width': '2px', 'border-color': 'black'}}>
+      </div>
+      <div className="collapsible-header" onClick={toggleVisibility_brainheatmap}>
+        <span><b>Brain Heatmaps</b></span>
+        <span className={`arrow ${isVisible_brainheatmap ? 'up' : 'down'}`}>
+          {isVisible_brainheatmap ? '▲' : '▼'}
+        </span>
+      </div>
+
+      <div className={`collapsible-content ${isVisible_brainheatmap ? 'open' : ''}`} style={{ 'border-style': 'solid', 'border-width': '2px', 'border-color': 'black' }}>
+
+
         <TransformWrapper
           defaultScale={1}
           defaultPositionX={200}
@@ -683,23 +790,23 @@ const color_fraction = ['SST-PV/cfos fraction',  'SST/cfos fraction', 'PV/cfos f
             </>
           )}
         </TransformWrapper>
-        </div>
         <i>- You can use the mouse wheel to zoom in or out of the image.</i><br></br>
-              <i>- Some regions has not been visualized that are not matched to <a target='_blank' href='https://www.sciencedirect.com/science/article/pii/S0092867420304025?via%3Dihub'>Allen Mouse Brain</a></i><br></br>
-    <h3>Regions shown in the brain heatmap</h3>
-        
-        <>{significantRegions && <Table  columns={columns} data={significantRegions} setSelectedRows={setSelectedSignificantRegionRows} />}</>
+        <i>- Some regions has not been visualized that are not matched to <a target='_blank' href='https://www.sciencedirect.com/science/article/pii/S0092867420304025?via%3Dihub'>Allen Mouse Brain</a></i><br></br>
 
       </div>
 
-      <hr></hr>
+      <div className="collapsible-header" onClick={toggleVisibility_significantregion}>
+        <span><b>Regions shown in the brain heatmap</b></span>
+        <span className={`arrow ${isVisible_significantregion ? 'up' : 'down'}`}>
+          {isVisible_significantregion ? '▲' : '▼'}
+        </span>
+      </div>
 
-      
-
-      <br></br>
+      <div className={`collapsible-content ${isVisible_significantregion ? 'open' : ''}`} style={{ 'border-style': 'solid', 'border-width': '2px', 'border-color': 'black' }}>
 
 
-
+        <>{significantRegions && <Table columns={columns} data={significantRegions} setSelectedRows={setSelectedSignificantRegionRows} />}</>
+      </div>
 
 
 

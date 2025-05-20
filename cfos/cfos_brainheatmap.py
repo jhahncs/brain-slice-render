@@ -60,7 +60,7 @@ except:
 
 
 fileHandler = logging.handlers.TimedRotatingFileHandler(
-    filename='logs/log_heatmap.txt', 
+    filename='logs/log_heatmap2.txt', 
     when = "midnight" ,  interval=1, backupCount=30
     )
 fileHandler.suffix = "-%Y%m%d"
