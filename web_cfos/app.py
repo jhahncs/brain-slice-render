@@ -373,15 +373,15 @@ def brainheatmap():
     #gen_brain_heatmap(DATA_FOLDER+"/"+output_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
     #print('end')
     sta = time.time() # 시간 측정
-    '''
+    
     img = Image.open(output_img_filename)
     byte_arr = io.BytesIO()
     img.save(byte_arr,  format='PNG')
     encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
-    '''
+    
     response = {
         'message': f'{pvalue_th} {fold_up} {fold_down}',
-        #'image': encoded_image,
+        'image': encoded_image,
         'df':df_sig_region_fold.to_dict(orient='records'),
         #'elapsed_time': eta - sta
     }
