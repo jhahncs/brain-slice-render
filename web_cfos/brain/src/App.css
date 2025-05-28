@@ -67,7 +67,12 @@ tfoot th {
   cursor: pointer;
 }
 
-
+.loading-message {
+  background-color: white;
+  padding: 20px;
+  border-radius: 5px;
+  font-size: 1.2em;
+}
 .collapsible-header {
   display: flex;
   justify-content: space-between;

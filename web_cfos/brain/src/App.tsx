@@ -5,7 +5,8 @@ import Table, { Show } from './Test.tsx';
 import axios from "axios";
 import { saveAs } from 'file-saver';
 import './App.css'
-import { downloadAsync, documentDirectory} from 'expo-file-system';
+import { downloadAsync, documentDirectory } from 'expo-file-system';
+
 
 const Toolbox = {
   display: "flex",
@@ -44,9 +45,12 @@ function App() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSignificantRegionRows, setSelectedSignificantRegionRows] = useState([]);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
 
   const [selectedFile, setSelectedFile] = useState(null);
+  const [groupNames, setGroupNames] = useState([]);
+
   const [preprocessSummary, setPreprocessSummary] = useState({});
   const [postprocessSummary, setPostprocessSummary] = useState(0);
   const [imageData, setImageData] = useState(1);
@@ -60,7 +64,7 @@ function App() {
   const [analysisMode, setAnalysisMode] = useState(null);
   const [checkedColors, setCheckedColors] = useState([]);
   const paramsInputDiv = useRef(null);
-        const [isVisible_paramsInputDiv, setIsVisible_paramsInputDiv] = useState(false);
+  const [isVisible_paramsInputDiv, setIsVisible_paramsInputDiv] = useState(false);
 
 
   const onFileInputClick = (event) => {
@@ -249,6 +253,35 @@ function App() {
       //setProjects([...projects, newDataName]);
       //alert("Successfully removed:"+data['message']);
       console.log(data['message'])
+      console.log(data['group_names'])
+      setGroupNames(data['group_names'])
+      setGroup1_name(data['group_names'][0])
+      setGroup2_name(data['group_names'][1])
+
+
+      let temp_color_basic = {}
+      let temp_color_minus = {}
+      let temp_color_fraction = {}
+      console.log(data['color_names'])
+      for (const _color of data['color_names']) {
+
+        if (_color.includes('+') || _color.includes('-'))
+          temp_color_minus[_color] = 0
+        else if (_color.includes('/'))
+          temp_color_fraction[_color] = 0
+        else
+          temp_color_basic[_color] = 0
+
+      }
+      console.log(temp_color_basic)
+      console.log(temp_color_minus)
+      console.log(temp_color_fraction)
+
+
+      setColor_basic(temp_color_basic)
+      setColor_minus(temp_color_minus)
+      setColor_fraction(temp_color_fraction)
+
       setPreprocessSummary(data['message']);
       setImageBasicStat(data['image'])
     } catch (error) {
@@ -336,23 +369,23 @@ function App() {
       columnHelper.accessor("TG number", {
         header: "TG number",
         cell: (info) => info.getValue(),
-        size:'5%'
+        size: '5%'
       }),
       columnHelper.accessor("Region Name", {
         header: "Region Name",
         cell: (info) => info.getValue(),
-        size:'70%'
+        size: '70%'
       }),
       columnHelper.accessor("fold", {
         header: "fold",
         cell: (info) => parseFloat(info.getValue().toFixed(3)),
         enableColumnFilter: false,
-        size:'10%'
+        size: '10%'
       }),
       columnHelper.accessor("Region ID", {
         header: "Region ID",
         cell: (info) => info.getValue(),
-        size:'5%'
+        size: '5%'
       }),
       /*
       columnHelper.accessor("color", {
@@ -394,6 +427,7 @@ function App() {
         return
 
       setIsLoading(true)
+      setLoadingMessage('Loading brain heatmaps... If this is your first time setting these parameters, it may take a few minutes.');
 
       console.log(checkedColors[0])
 
@@ -404,6 +438,8 @@ function App() {
       //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
       formData.append('color', checkedColors[0])
       formData.append('dataname', selectedProjects[0])
+      formData.append('group1_name', group1_name)
+      formData.append('group2_name', group2_name)
 
 
 
@@ -478,8 +514,8 @@ function App() {
     console.log(checkedColors)
     setIsLoading(true)
     setCheckedColors([]);
-    
-    
+
+
 
     const formData = new FormData();
     formData.append('pvalue', pvalue)
@@ -520,11 +556,37 @@ function App() {
 
 
   }
+
+  const [group1_name, setGroup1_name] = useState(null);
+  const [group2_name, setGroup2_name] = useState(null);
+
+
+
+  const handleGroup1NameSelect = async (event) => {
+    event.preventDefault();
+    setIsVisible_paramsInputDiv(false)
+    setGroup1_name(event.target.value)
+
+  };
+
+  const handleGroup2NameSelect = async (event) => {
+    event.preventDefault();
+    setIsVisible_paramsInputDiv(false)
+    setGroup2_name(event.target.value)
+
+  };
+
+
   const handleUpdateParams = async (event) => {
     event.preventDefault();
     if (selectedProjects.length == 0) {
 
       alert("please select a data")
+      return
+    }
+    if (group1_name == group2_name) {
+
+      alert("Please select different groups")
       return
     }
     setCheckedColors([]);
@@ -534,6 +596,8 @@ function App() {
     setIsAllDownlodButtonVisible(false)
 
     setIsLoading(true)
+    setLoadingMessage('Calculating fold changes... If this is your first time setting these parameters, it may take a few minutes.');
+
     setColor_basic(color_basic_const)
     setColor_minus(color_minus_const)
     setColor_fraction(color_fraction_const)
@@ -542,14 +606,18 @@ function App() {
     formData.append('pvalue', pvalue)
     formData.append('fold_up', foldup)
     formData.append('fold_down', folddown)
+    formData.append('group1_name', group1_name)
+    formData.append('group2_name', group2_name)
+
     //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
     formData.append('color', "UPDATE")
     formData.append('dataname', selectedProjects[0])
-
+    console.log(group1_name)
+    console.log(group2_name)
 
 
     try {
-      const response = await fetch('/brainheatmap', {
+      const response = await fetch('/fold', {
         method: 'POST',
         'Content-Type': 'multipart/form-data',
         body: formData
@@ -577,7 +645,7 @@ function App() {
       setFoldup_cur(foldup)
       setFolddown_cur(folddown)
       setPvalue_cur(pvalue)
-          setIsVisible_paramsInputDiv(true);
+      setIsVisible_paramsInputDiv(true);
 
     } catch (error) {
       console.error('업로드 실패', error);
@@ -626,7 +694,7 @@ function App() {
   return (
 
     <div style={{ cursor: isLoading ? 'wait' : 'default' }}>
-      {isLoading && <div className="overlay"></div>}
+      {isLoading && <div className="overlay"><div className="loading-message">{loadingMessage}</div></div>}
 
       <div>
         <h3>Data uploaded in the server </h3>
@@ -694,14 +762,14 @@ function App() {
           {preprocessSummary &&
             (Object.keys(preprocessSummary).map((key) => (
               <div key={key}>
-                <strong>{key}:</strong> {preprocessSummary[key]}
+                <strong>{key}: </strong> {preprocessSummary[key]}
               </div>
             )
             ))
 
           }
         </p>
-        <div style={{ 'border-style': 'solid', 'border-width': '2px', 'border-color': 'black' }}>
+        <div style={{ 'borderStyle': 'solid', 'borderWidth': '2px', 'borderColor': 'black' }}>
           <TransformWrapper
             defaultScale={1}
             defaultPositionX={200}
@@ -728,7 +796,7 @@ function App() {
       </div>
 
       <div className="collapsible-header" onClick={toggleVisibility_foldchange}>
-        <span><b>Fold Change(EXP/VEH)</b></span>
+        <span><b>Fold Change</b></span>
         <span className={`arrow ${isVisible_foldchange ? 'up' : 'down'}`}>
           {isVisible_foldchange ? '▲' : '▼'}
         </span>
@@ -736,17 +804,45 @@ function App() {
 
       <div className={`collapsible-content ${isVisible_foldchange ? 'open' : ''}`}>
 
+
+
         <form >
+
+          <b>Group1:</b>;&nbsp;
+          <select
+            value={group1_name} // ...force the select's value to match the state variable...
+            onChange={e => handleGroup1NameSelect(e)} // ... and update the state variable on any change!
+          >
+
+            {groupNames &&
+              groupNames.map(item => (
+
+                <option style={{ cursor: isLoading ? 'wait' : 'default' }} name={item} key={item} value={item}>{item}</option>
+              ))}
+          </select>&nbsp;&nbsp;
+          <b>Group2:</b>;&nbsp;
+          <select
+            value={group2_name} // ...force the select's value to match the state variable...
+            onChange={e => handleGroup2NameSelect(e)} // ... and update the state variable on any change!
+          >
+
+            {groupNames &&
+              groupNames.map(item => (
+
+                <option style={{ cursor: isLoading ? 'wait' : 'default' }} name={item} key={item} value={item}>{item}</option>
+              ))}
+          </select>
+
           <table border='1px'>
             <thead></thead>
             <tbody>
               <tr padding='20px'>
                 <td padding='20px'>
-                  Fold(EXP/VEH) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
+                  Fold(Group1/Group2) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
                   &nbsp; in green
                 </td>
                 <td padding='20px'>
-                  Fold(EXP/VEH) &#8804; <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
+                  Fold(Group1/Group2) &#8804; <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
                   &nbsp; in red
                 </td>
                 <td padding='20px'>
@@ -762,49 +858,49 @@ function App() {
 
                 </td>
               </tr>
-              
+
 
             </tbody>
           </table>
-          
 
-          <div ref={paramsInputDiv} style={{ cursor: isLoading ? 'wait' : 'default',  display: isVisible_paramsInputDiv ? 'block' : 'none' }}>
+
+          <div ref={paramsInputDiv} style={{ cursor: isLoading ? 'wait' : 'default', display: isVisible_paramsInputDiv ? 'block' : 'none' }}>
             <br></br>
-            <div>Current parameters settings: fold up = {foldup_cur}, fold down = {folddown_cur}, pvalue = {pvalue_cur}</div>
-
+            <div key='fold params'>Current parameters settings: <br></br>Group1 = {group1_name}, Group2 = {group2_name}, fold up = {foldup_cur}, fold down = {folddown_cur}, pvalue = {pvalue_cur}</div>
+            <br></br>
             {color_basic &&
               Object.keys(color_basic).map(item => (
 
-                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" key={item} id={item} name={item} value={item}
                   checked={checkedColors.includes(item)}
                   onChange={handleCheckboxColorsChange}></input>
-                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item}  ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_basic[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_basic[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
+                  <span key={item + 'span'} style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal' }}>{item}  ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_basic[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_basic[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
               ))}
             <br></br>
             {color_minus &&
               Object.keys(color_minus).map(item => (
 
-                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" key={item} id={item} name={item} value={item}
                   checked={checkedColors.includes(item)}
                   onChange={handleCheckboxColorsChange}></input>
-                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_minus[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_minus[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
+                  <span key={item + 'span'} style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal' }}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_minus[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_minus[item]['down']}</span>) </span>&nbsp;&nbsp;&nbsp;</>
               ))}
-                     <br></br>
+            <br></br>
             {color_fraction &&
               Object.keys(color_fraction).map(item => (
 
-                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" id={item} name={item} value={item}
+                <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="checkbox" key={item} id={item} name={item} value={item}
                   checked={checkedColors.includes(item)}
                   onChange={handleCheckboxColorsChange}></input>
-                  <span style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal'}}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_fraction[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_fraction[item]['down']}</span>)</span> &nbsp;&nbsp;&nbsp;</>
+                  <span key={item + 'span'} style={{ fontWeight: checkedColors.includes(item) ? 'bold' : 'normal' }}>{item} ( <span style={{ color: 'green' }}> {upArrowUnicode} {color_fraction[item]['up']}</span>,  <span style={{ color: 'red' }}> {downArrowUnicode} {color_fraction[item]['down']}</span>)</span> &nbsp;&nbsp;&nbsp;</>
               ))}
-                      <br></br>
-          <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"ALL"} name={"ALL"} value={"Download All Heatmaps"}
-            onClick={handleAllDownload}></input>
+            <br></br>
+            <><input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"ALL"} name={"ALL"} value={"Download All Heatmaps"}
+              onClick={handleAllDownload}></input>
             </>
 
-          
-                    </div>
+
+          </div>
 
           <i>For new threshold settings, it takes time to generate a heatmap for these thresholds.</i><br></br>
 
@@ -820,7 +916,7 @@ function App() {
         </span>
       </div>
 
-      <div className={`collapsible-content ${isVisible_brainheatmap ? 'open' : ''}`} style={{ 'border-style': 'solid', 'border-width': '2px', 'border-color': 'black' }}>
+      <div className={`collapsible-content ${isVisible_brainheatmap ? 'open' : ''}`} style={{ 'borderStyle': 'solid', 'borderWidth': '2px', 'borderColor': 'black' }}>
 
 
         <TransformWrapper

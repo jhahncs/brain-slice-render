@@ -117,6 +117,8 @@ def newdata():
         print(filepath)
         print(output_dir)
         cfos = Cfos(filename = filepath, output_dir = output_dir, load_from_files = False)
+
+        '''
         df_fold = cal_fold(cfos, cfos.df_mean_cor_sag,output_dir+"/fold.csv")
         filename_pvalue_permutation_test = output_dir+"/pvalue_permutation_test.csv"
         filename_pvalue_ttest = output_dir+"/pvalue_ttest.csv"
@@ -127,11 +129,11 @@ def newdata():
         df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
         df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
         df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
-
+        
         #cfos = str(sta)
         #session['cfos_obj'] = cfos
 
-        '''
+        
         img = Image.open('files/heatmap_cfos total.png')
         byte_arr = io.BytesIO()
         img.save(byte_arr,  format='PNG')
@@ -205,10 +207,18 @@ def load():
         byte_arr = io.BytesIO()
         img.save(byte_arr,  format='PNG')
         encoded_image = base64.b64encode(byte_arr.getvalue()).decode('ascii')
-
+        group_name_dict = []
+        for g in cfos.group_names:
+            _ro = {}
+            _ro['label'] = g
+            _ro['value'] = g
+            group_name_dict.append(_ro)
         response = {
             'message': cfos.preprocess_summary(),
             'image':encoded_image,
+            'group_names':cfos.group_names,
+            'color_names':cfos.color_list_full,
+
             
         }
         
@@ -245,33 +255,37 @@ def projects():
 
 
 
-def load_object(output_dir):
-    filename_pvalue_permutation_test = DATA_FOLDER+"/"+output_dir+"/pvalue_permutation_test.csv"
-    filename_pvalue_ttest = DATA_FOLDER+"/"+output_dir+"/pvalue_ttest.csv"
-    filename_pvalue_permutation_test_fdr = DATA_FOLDER+"/"+output_dir+"/pvalue_permutation_test_fdr.csv"
-    filename_pvalue_ttest_fdr = DATA_FOLDER+"/"+output_dir+"/pvalue_ttest_fdr.csv"
-
+def load_object(output_dir,temp_dir, group1_name, group2_name):
 
     cfos = Cfos(None, DATA_FOLDER+"/"+output_dir, load_from_files=True)
+    cfos.build_group1_and_group2(group1_name,group2_name, load_from_files = True)
 
-    df_fold = cal_fold(cfos, cfos.df_mean_cor_sag,DATA_FOLDER+"/"+output_dir+"/fold.csv")
-    df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 'permutation_test',filename_pvalue_permutation_test)
+    df_fold = cal_fold(cfos, cfos.df_by_two_group_and_color, group1_name, group2_name,DATA_FOLDER+"/"+output_dir+"/fold.csv")
+
+    filename_pvalue_permutation_test = temp_dir+"/pvalue_permutation_test.csv"
+    filename_pvalue_ttest = temp_dir+"/pvalue_ttest.csv"
+    filename_pvalue_permutation_test_fdr = temp_dir+"/pvalue_permutation_test_fdr.csv"
+    filename_pvalue_ttest_fdr = temp_dir+"/pvalue_ttest_fdr.csv"
+
+    df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_by_two_group_and_color, 'permutation_test',filename_pvalue_permutation_test)
     df_fdr_permutation_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_permutation_test_fdr)
-    df_pvalue_permutation_test = cal_pvalue(cfos,cfos.df_mean_cor_sag, 't_test',filename_pvalue_ttest)
-    df_fdr_t_test = cal_fdr(cfos, df_pvalue_permutation_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
+    df_pvalue_t_test = cal_pvalue(cfos,cfos.df_by_two_group_and_color, 't_test',filename_pvalue_ttest)
+    df_fdr_t_test = cal_fdr(cfos, df_pvalue_t_test, _alpha = 0.05, result_filename=filename_pvalue_ttest_fdr)
 
     return cfos, df_fold, df_fdr_permutation_test, df_fdr_t_test
 #df_sig_region_fold = None
 @app.route('/downloadall', methods=['POST'])
 def downloadall():
     print('downloadall')
+    group1_name = request.form.get('group1_name')
+    gropu2_name = request.form.get('gropu2_name')
     pvalue_th = float(request.form.get('pvalue'))
     fold_up = float(request.form.get('fold_up'))
     fold_down = float(request.form.get('fold_down'))
     output_dir = request.form.get('dataname')
 
     print(pvalue_th,fold_up,fold_down,output_dir)
-    _filename_from_params = filename_from_params(pvalue_th, fold_up, fold_down)
+    _filename_from_params = filename_from_params(group1_name, gropu2_name,pvalue_th, fold_up, fold_down)
     temp_dir = DATA_FOLDER+"/"+output_dir+"/"+_filename_from_params
 
 
@@ -301,11 +315,15 @@ def downloadall():
 
         #return send_from_directory(uploads_dir, secure_filename, as_attachment=True)
     
-@app.route('/brainheatmap', methods=['POST'])
-def brainheatmap():
+@app.route('/fold', methods=['POST'])
+def fold():
     #sema.acquire() # 세마포어 획득
 
-    print('brainheatmap')
+    print('fold')
+    group1_name = request.form.get('group1_name')
+
+    group2_name = request.form.get('group2_name')
+
     pvalue_th = float(request.form.get('pvalue'))
     fold_up = float(request.form.get('fold_up'))
     fold_down = float(request.form.get('fold_down'))
@@ -322,7 +340,7 @@ def brainheatmap():
     
 
     print(pvalue_th,fold_up,fold_down,color,output_dir)
-    _filename_from_params = filename_from_params(pvalue_th, fold_up, fold_down)
+    _filename_from_params = filename_from_params(group1_name,group2_name,pvalue_th, fold_up, fold_down)
     temp_dir = DATA_FOLDER+"/"+output_dir+"/"+_filename_from_params
 
     print(temp_dir)
@@ -332,7 +350,7 @@ def brainheatmap():
     if not os.path.exists(f'{temp_dir}/color_2_dict_up_{_filename_from_params}.json') or not os.path.exists(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json'):
 
         sta = time.time() # 시간 측정
-        cfos, df_fold, df_fdr_permutation_test, df_fdr_t_test = load_object(output_dir)
+        cfos, df_fold, df_fdr_permutation_test, df_fdr_t_test = load_object(output_dir,temp_dir,group1_name,group2_name)
         eta = time.time() # 시간 측정
         print('loading:',eta-sta)
 
@@ -347,15 +365,9 @@ def brainheatmap():
             json.dump(color_2_dict_up, f)
         with open(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json', 'w') as f:
             json.dump(color_2_dict_down, f)
-        color_list = list([c for c in df_fold.columns if c not in ['Region ID','TG number','Region Name']])
-        #color_list = [color]
-        sta = time.time() # 시간 측정
-        gen_brain_heatmap(temp_dir, color_list, df_fdr_permutation_test, pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
-        eta = time.time() # 시간 측정
-        print('gen_brain_heatmap:',eta-sta)
+
    
     else:
-        df_sig_region_fold = pd.read_csv(f'{temp_dir}/heatmap_significant_regions_{_filename_from_params}.csv')
         with open(f'{temp_dir}/color_2_dict_up_{_filename_from_params}.json', 'r') as f:
             color_2_dict_up = json.load(f)
         with open(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json', 'r') as f:
@@ -363,20 +375,91 @@ def brainheatmap():
 
 
 
-    if color == 'UPDATE':
-        color_2_updown = {}
-        for k in color_2_dict_up:
-            color_2_updown[k] = {}
-            color_2_updown[k]['up'] = len(color_2_dict_up[k])
-            color_2_updown[k]['down'] = len(color_2_dict_down[k])
-        
+    color_2_updown = {}
+    for k in color_2_dict_up:
+        color_2_updown[k] = {}
+        color_2_updown[k]['up'] = len(color_2_dict_up[k])
+        color_2_updown[k]['down'] = len(color_2_dict_down[k])
+    
 
+    response = {
+        #'df':df_sig_region_fold.to_dict(orient='records'),
+        'freq':color_2_updown,
+        #'elapsed_time': eta - sta
+    }
+    return jsonify(response)
+
+
+    
+@app.route('/brainheatmap', methods=['POST'])
+def brainheatmap():
+    #sema.acquire() # 세마포어 획득
+
+    print('brainheatmap')
+    group1_name = request.form.get('group1_name')
+
+    group2_name = request.form.get('group2_name')
+
+    pvalue_th = float(request.form.get('pvalue'))
+    fold_up = float(request.form.get('fold_up'))
+    fold_down = float(request.form.get('fold_down'))
+    color = request.form.get('color')
+    output_dir = request.form.get('dataname')
+    if color == '':
         response = {
-            'df':df_sig_region_fold.to_dict(orient='records'),
-            'freq':color_2_updown,
+            'message': "",
+            'image': "",
+            'df':"",
             #'elapsed_time': eta - sta
         }
         return jsonify(response)
+    
+
+    print(pvalue_th,fold_up,fold_down,color,output_dir)
+    _filename_from_params = filename_from_params(group1_name,group2_name,pvalue_th, fold_up, fold_down)
+    temp_dir = DATA_FOLDER+"/"+output_dir+"/"+_filename_from_params
+
+    print(temp_dir)
+    #if not os.path.exists(temp_dir):
+    os.makedirs(temp_dir, exist_ok=True)
+    heatmap_files = glob.glob(temp_dir+"/heatmap*.png")
+
+
+    sta = time.time() # 시간 측정
+    #color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, df_fold, df_fdr_permutation_test, pvalue_th,fold_up,fold_down)
+    #df_sig_region_fold.to_csv(f'{temp_dir}/heatmap_significant_regions_{_filename_from_params}.csv',index=None)
+    df_sig_region_fold = pd.read_csv(f'{temp_dir}/heatmap_significant_regions_{_filename_from_params}.csv')
+    with open(f'{temp_dir}/color_2_dict_up_{_filename_from_params}.json', 'r') as f:
+        color_2_dict_up = json.load(f)
+    with open(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json', 'r') as f:
+        color_2_dict_down = json.load(f)
+
+    eta = time.time() # 시간 측정
+    print('build_dict:',eta-sta)
+
+
+    if len(heatmap_files) == 0:
+
+        sta = time.time() # 시간 측정
+        cfos, df_fold, df_fdr_permutation_test, df_fdr_t_test = load_object(output_dir,temp_dir,group1_name,group2_name)
+        eta = time.time() # 시간 측정
+        print('loading:',eta-sta)
+
+
+
+        #color_list = color_list[:1]
+
+        color_list = list([c for c in df_fold.columns if c not in ['Region ID','TG number','Region Name']])
+        #color_list = [color]
+        sta = time.time() # 시간 측정
+        gen_brain_heatmap(temp_dir, group1_name, group2_name, color_list, df_fdr_permutation_test,"permutation_test", pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down)
+        eta = time.time() # 시간 측정
+        print('gen_brain_heatmap:',eta-sta)
+   
+
+
+
+
     
     #heatmap_{color_code.replace("/","_")}.png
     df_sig_region_fold = df_sig_region_fold.query(f'color=="{color}"')
@@ -401,7 +484,6 @@ def brainheatmap():
     eta = time.time() # 시간 측정
     print('image to byte:',eta-sta)
     return jsonify(response)
-
 
 @app.route("/download/<path:filename>")
 def download_test(filename):
