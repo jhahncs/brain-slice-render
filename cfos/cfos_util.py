@@ -67,7 +67,7 @@ class Cfos():
         logger.info("cfos init begin")
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
-        self.prefix_to_remove_column = ['Unnamed',"average","VEH","EXP","mean","sem","%error",'Analyses']
+        self.prefix_to_remove_column = ['Mean_','SEM_','Unnamed',"average","VEH","EXP","mean","sem","%error",'Analyses']
 
         
         self.df_dict = {}
@@ -79,6 +79,7 @@ class Cfos():
             for sheet in wb.worksheets:
                 df_name = sanitize_folder_name(sheet.title)
                 df_temp = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
+
                 self.df_dict[df_name] = df_temp
                 wb = load_workbook(filename)
                 logger.info(f'{sheet.title} -> {df_name}')
@@ -187,7 +188,11 @@ class Cfos():
 
 
     def _get_columns_color(self, _df, _colors):
+
+
         return sorted(list(set([c for c in _df.columns if len(c.split("_")) == 2 and c.split("_")[1] in _colors])))
+    
+
     def _get_sample_ids(self, group_name):
         df_group1 = self.df_dict[group_name]
         
