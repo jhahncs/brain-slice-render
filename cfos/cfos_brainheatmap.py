@@ -20,7 +20,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib 
 from matplotlib import gridspec
-
+import tifftools
 import importlib
 from brainglobe_heatmap import heatmaps
 
@@ -70,7 +70,7 @@ logger.addHandler(fileHandler)
 
 
 bg_atlas = BrainGlobeAtlas("allen_mouse_50um", check_latest=False)
-
+cfos = None
 
 def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, fold_up=1.5, fold_down=0.5):
     global bg_atlas
@@ -125,8 +125,11 @@ def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, 
     #return data_dict_up, data_dict_down, not_found_region_id_with_no_zero_value
 
 df_fold = None
-def build_dict(cfos, _df_fold, ptest, pvalue_th, fold_up, fold_down):
+def build_dict(cfos, _df_fold, ptest, params: cfos_util.Cfos_params):
     logger.info("build_dict begin")
+    logger.info(f"zero value regions: {len(list(cfos.region_ids_with_all_zero_exp_veh.index))}")
+
+    _df_fold = _df_fold.drop(list(cfos.region_ids_with_all_zero_exp_veh.index))
     global df_fold
     df_fold = _df_fold
     color_2_dict_up = {}
@@ -145,9 +148,9 @@ def build_dict(cfos, _df_fold, ptest, pvalue_th, fold_up, fold_down):
         df_fold_list.append(df_fold)
         ptest_list.append(ptest)
         _color_list.append(c)
-        pvalue_list.append(pvalue_th)
-        fold_up_list.append(fold_up)
-        fold_down_list.append(fold_down)
+        pvalue_list.append(params.pvalue_th)
+        fold_up_list.append(params.fold_up)
+        fold_down_list.append(params.fold_down)
 
     '''
     not_found_region_id = []
@@ -174,8 +177,8 @@ def build_dict(cfos, _df_fold, ptest, pvalue_th, fold_up, fold_down):
         color_2_up_down = {}
         for c in color_list:
             color_2_up_down['color'] = c
-            color_2_up_down[f'Fold > {fold_up}'] = len(color_2_dict_up[c])
-            color_2_up_down[f'Fold < {fold_down}'] = len(color_2_dict_down[c])
+            color_2_up_down[f'Fold > {params.fold_up}'] = len(color_2_dict_up[c])
+            color_2_up_down[f'Fold < {params.fold_down}'] = len(color_2_dict_down[c])
             num_of_regions_with_fold.append(color_2_up_down)
             logger.info(f'{c}, up {len(color_2_dict_up[c])}, down {len(color_2_dict_down[c])}')
  
@@ -296,12 +299,26 @@ df_num_regions.to_csv('output/sig_regions.csv')
 '''
 
 
+from matplotlib.transforms import Bbox
+
+def full_extent(ax, pad=0.0):
+    """Get the full extent of an axes, including axes labels, tick labels, and
+    titles."""
+    # For text objects, we need to draw the figure first, otherwise the extents
+    # are undefined.
+    ax.figure.canvas.draw()
+    items = ax.get_xticklabels() + ax.get_yticklabels() 
+#    items += [ax, ax.title, ax.xaxis.label, ax.yaxis.label]
+    items += [ax, ax.title]
+    bbox = Bbox.union([item.get_window_extent() for item in items])
+
+    return bbox.expanded(1.0 + pad, 1.0 + pad)
 
 
-
-def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pvalue_th, color_code, fold_up, fold_down,color_2_dict_up,color_2_dict_down):
+def _gen_brain_heatmap(output_dir, params, ptest, color_code,
+                       color_2_dict_up,color_2_dict_down):
     
-
+    global cfos
     try:
         plt.clf()
     except:
@@ -310,10 +327,10 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
 
     if len(color_2_dict_up[color_code]) == 0 and len(color_2_dict_down[color_code])==0:
         return
-    fig = plt.figure(figsize=(25, 10))
+    fig = plt.figure(figsize=(25*(params.num_of_imgs_in_brain_heatmap/20), 10))
     #fig, axs = plt.subplots(2,7, figsize=(30, 10))
-    fig.suptitle(f'{color_code} {group1_name}/{group2_name}', fontsize=20)
-    spec = gridspec.GridSpec(ncols=21, nrows=9, width_ratios=[1]*20 + [0.05], height_ratios = [1,1,1,0.2,1,1,1,0.2,0.5], wspace=0.001,
+    fig.suptitle(f'{color_code}  {params.group1_name} / {params.group2_name}', fontsize=20)
+    spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap+1, nrows=9, width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.1], height_ratios = [1,1,1,0.2,1,1,1,0.2,0.8], wspace=0.001,
                             hspace=0.6)
 
     maxmin_dict = {}
@@ -321,8 +338,9 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
     ax_row_index = 0
     ax_col_index = 0
     spec_index = 0
+    not_visualized_regions = []
     #for subtitle, color, data_dict in [(f'Fold > {fold_up}','Blues',color_2_dict_up[color_code]),(f'Fold < {fold_down}',"Reds_r",color_2_dict_down[color_code])]:
-    for _ii, (subtitle, color, _data_dict) in enumerate([(f'Fold > {fold_up}','Greens',color_2_dict_up[color_code]),(f'Fold < {fold_down}',"Reds_r",color_2_dict_down[color_code])]):
+    for _ii, (subtitle, color, _data_dict) in enumerate([(f'Fold > {params.fold_up}','Greens',color_2_dict_up[color_code]),(f'Fold < {params.fold_down}',"Reds_r",color_2_dict_down[color_code])]):
         #print(data_dict)
         #logger.info(f'{subtitle},{color_code},{len(data_dict)}')
         print(f'{subtitle},{color_code},{len(_data_dict)}')
@@ -335,7 +353,16 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
                 value = bg_atlas.structures[str(k)]
             except:
                 print('not found:',str(k))
+                not_visualized_region = {}
+                not_visualized_region['Region ID'] = str(k)
+                not_visualized_region['Region Name'] = cfos.region_id_2_name[str(k)]
+                not_visualized_region['TG Number'] = cfos.region_id_2_tg_id[str(k)]
+                not_visualized_regions.append(not_visualized_region)
                 continue
+
+
+            #if len(data_dict) >= 5:
+            #    break
             data_dict[value['acronym']] = v
         #ax_col_index = 0
         #ax = fig.add_subplot(spec[ax_row_index:ax_row_index+3,ax_col_index])
@@ -351,7 +378,9 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
         # AP Frontal 12000
         # LR saggital 11400
         # DV horizontal 7000
-        for _i, (cut, min_dist, max_dist, gap) in enumerate([('frontal',2000,12000,500),('sagittal',6000,12000,250),('horizontal',2000,7000,250)]):
+        for _i, (cut, min_dist, max_dist, gap) in enumerate([('frontal',2000,12000,int(500*(20/params.num_of_imgs_in_brain_heatmap))),
+                                                             ('sagittal',6000,12000,int(250*(20/params.num_of_imgs_in_brain_heatmap))),
+                                                             ('horizontal',2000,7000,int(250*(20/params.num_of_imgs_in_brain_heatmap)))]):
 
             ax_col_index = 0
             
@@ -365,8 +394,8 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
             #logger.info(f'{cut},{distance_list}')
             print(f'{cut},{distance_list}')
 
-
-            for distance in distance_list[:20]:
+            tiff_files = []
+            for distance in distance_list[:params.num_of_imgs_in_brain_heatmap]:
             #for distance in distance_list[:1]:
                 
 
@@ -375,22 +404,33 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
                     position=distance,
                     orientation=cut,
                     thickness=1,
-                    format="3D",
+                    format="2D",
                     cmap= color,
                     vmin= _min,
                     vmax= _max,
                     label_regions=False,
                     interactive = False
                 )
-
+                #scene.show()
                 #ax = axs[ax_row_index,ax_col_index]
                 ax = fig.add_subplot(spec[ax_row_index, ax_col_index])
                 
                 #if ax_col_index == 19:
                 #    scene.plot_subplot(fig=fig, ax=ax, show_cbar=True, hide_axes=True)
                 #else:
-                scene.plot_subplot(fig=fig, ax=ax, show_cbar=False, hide_axes=True)
-                ax.set_title(f'{distance} \u03BCm', fontsize=5)
+                _ind_fig, _ind_p = scene.plot_subplot(fig=fig, ax=ax, show_cbar=False, hide_axes=True)
+                #ax.figure.savefig(f'{output_dir}/heatmap_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff')
+
+                # Save just the portion _inside_ the second axis's boundaries
+                extent = full_extent(ax).transformed(fig.dpi_scale_trans.inverted())
+                # Alternatively,
+                # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
+                ind_file = f'{output_dir}/heatmap_{color}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+                fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
+                tiff_files.append(ind_file)
+
+                if params.dist_label == 'true':
+                    ax.set_title(f'{distance} \u03BCm', fontsize=5)
                 ax_col_index += 1
             
             
@@ -400,14 +440,23 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
                 #divider = make_axes_locatable(ax)
                 #cax = divider.append_axes("left", size="5%", pad=0.05)
                 cbar = fig.colorbar(
-                    matplotlib.cm.ScalarMappable(norm=norm, cmap=color), cax=ax,fraction=0.046, pad=0.04
+                    matplotlib.cm.ScalarMappable(norm=norm, cmap=color), cax=ax, fraction=0.046, pad=0.04
                 )
                 for t in cbar.ax.get_yticklabels():
                     t.set_fontsize(5)
-                cbar.set_label(f'Fold \u0394\n({group1_name}/{group2_name})', fontsize=5)
+                cbar.set_label(f'Fold \u0394\n({params.group1_name} / {params.group2_name})', fontsize=5)
             ax_row_index += 1
        
+                    # Read the first TIFF file
+            merged_tiff_filename = f'{output_dir}/heatmap_{cut}_{"ALL"}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+            if not os.path.exists(merged_tiff_filename):
+                merged_tiff = tifftools.read_tiff(tiff_files[0])
 
+                # Iterate through the remaining files and append their IFDs
+                for file in tiff_files[1:]:
+                    tiff = tifftools.read_tiff(file)
+                    merged_tiff['ifds'].extend(tiff['ifds'])
+                tifftools.write_tiff(merged_tiff, merged_tiff_filename)
         
 
         
@@ -419,41 +468,46 @@ def _gen_brain_heatmap(output_dir, group1_name, group2_name, ptest,ptest_name,pv
     ax_col_index = 0
     ax = fig.add_subplot(spec[ax_row_index,:])
     ax.set_axis_off()
-    ax.text(0, 0.1, f'Significant regions were determined by a {ptest_name} with FDR corrected (pvalue < {pvalue_th})\nBlue color: Fold \u0394 ({group1_name}/{group2_name}) > {fold_up},  {len(color_2_dict_up[color_code])} regions visualized.\nRed color: Fold \u0394 ({group1_name}/{group2_name}) < {fold_down},  {len(color_2_dict_down[color_code])} regions visualized.\nEach three rows is with frontal(Rostal \u2192 Caudal), saggital, horizontal view, respectively\n',  fontsize = 8)
+    not_visualized_regions_text = ''
+    if len(not_visualized_regions) > 0:
+        not_visualized_regions_text += f'{not_visualized_region["Region Name"]}({not_visualized_region["Region ID"]}),'
+
+    ax.text(0, 0.1, f'{len(not_visualized_regions)} regions are not visualized (mis match between TG and Altals): {not_visualized_regions_text}\n{params.stat_desc()}\nGreen color: Fold \u0394 ({params.group1_name}/{params.group2_name}) > {params.fold_up},  {len(color_2_dict_up[color_code])} regions visualized.\nRed color: Fold \u0394 ({params.group1_name}/{params.group2_name}) < {params.fold_down},  {len(color_2_dict_down[color_code])} regions visualized.\nFrontal(Rostal \u2192 Caudal), saggital, horizontal view, respectively\n',  fontsize = 8)
     plt.tight_layout()
     #plt.show()
-    _filename_from_params = cfos_util.filename_from_params(group1_name, group2_name, pvalue_th, fold_up, fold_down)
-    fig.savefig(f'{output_dir}/heatmap_{color_code.replace("/","_").replace(" ","_")}_{_filename_from_params}.png', dpi=600, bbox_inches='tight', pad_inches=1)
 
 
-def gen_brain_heatmap(output_dir,group1_name, group2_name, color_list, ptest,ptest_name,pvalue_th, fold_up, fold_down,color_2_dict_up,color_2_dict_down):       
+    _filename = f'{output_dir}/heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.png'
+    fig.savefig(_filename, dpi=600, bbox_inches='tight', pad_inches=1)
+    logger.info(f'brain heatmap saved into : {_filename}')
+
+
+
+    #return plt
+
+def gen_brain_heatmap(_cfos,output_dir, stat_test_result, color_list, 
+                      color_2_dict_up,color_2_dict_down, params, single_core_mode = False):       
+    
+    global cfos
+    cfos = _cfos
     output_dir_list = []
-    group1_name_list = []
-    group2_name_list = []
-
+    
     ptest_list = []
-    ptest_name_list = []
-    pvalue_ts_list = []
-    color_code_list = []
-    fold_up_list= []
-    fold_down_list= []
+    parama_list = []
     color_2_dict_up_list= []
     color_2_dict_down_list= []
-
+    color_code_list = []
     for color_code in color_list:
         output_dir_list.append(output_dir)
-        group1_name_list.append(group1_name)
-        group2_name_list.append(group2_name)
-        ptest_list.append(ptest)
-        ptest_name_list.append(ptest_name)
-        pvalue_ts_list.append(pvalue_th)
-
+        parama_list.append(params)
         color_code_list.append(color_code)
-        fold_up_list.append(fold_up)
-        fold_down_list.append(fold_down)
+        ptest_list.append(stat_test_result)
         color_2_dict_up_list.append(color_2_dict_up)
         color_2_dict_down_list.append(color_2_dict_down)
+        if single_core_mode:
+            _gen_brain_heatmap(output_dir,params,stat_test_result,color_code, color_2_dict_up,color_2_dict_down )
 
-    print(f'the number of jobs:{len(color_code_list)}')
-    with multiprocessing.Pool() as pool: # Use a pool of 4 processes
-        pool.starmap(_gen_brain_heatmap, zip(output_dir_list,group1_name_list, group2_name_list,  ptest_list,ptest_name_list,pvalue_ts_list, color_code_list,fold_up_list,fold_down_list,color_2_dict_up_list,color_2_dict_down_list))
+    if not single_core_mode:
+        print(f'the number of jobs:{len(color_code_list)}')
+        with multiprocessing.Pool() as pool: # Use a pool of 4 processes
+            pool.starmap(_gen_brain_heatmap, zip(output_dir_list,parama_list,ptest_list, color_code_list, color_2_dict_up_list,color_2_dict_down_list))

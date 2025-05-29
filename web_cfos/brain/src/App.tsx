@@ -233,6 +233,10 @@ function App() {
     console.log('handleSelectItem')
     console.log(index)
 
+         setImageData(null)
+      setSignificantRegions(null);
+      setIsAllDownlodButtonVisible(false)
+          setIsVisible_paramsInputDiv(false)
 
     setSelectedProjects([index]);
     console.log(selectedProjects)
@@ -245,7 +249,9 @@ function App() {
     try {
       const response = await fetch('/load', {
         method: 'POST',
+
         'Content-Type': 'multipart/form-data',
+        
         body: formData
       });
 
@@ -315,6 +321,7 @@ function App() {
       const response = await fetch('/removedata', {
         method: 'POST',
         'Content-Type': 'multipart/form-data',
+        
         body: formData
       });
 
@@ -431,22 +438,15 @@ function App() {
 
       console.log(checkedColors[0])
 
-      const formData = new FormData();
-      formData.append('pvalue', pvalue)
-      formData.append('fold_up', foldup)
-      formData.append('fold_down', folddown)
-      //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
-      formData.append('color', checkedColors[0])
-      formData.append('dataname', selectedProjects[0])
-      formData.append('group1_name', group1_name)
-      formData.append('group2_name', group2_name)
-
+      const formData = build_form();
 
 
       try {
         const response = await fetch('/brainheatmap', {
           method: 'POST',
-          'Content-Type': 'multipart/form-data',
+        'Content-Type': 'multipart/form-data',
+      
+          
           body: formData
         });
 
@@ -485,9 +485,7 @@ function App() {
       alert("please select a data")
       return
     }
-    console.log(event.target)
-    console.log(event.target.checked)
-    console.log(checkedColors)
+
     setIsLoading(true)
     const itemValue = event.target.value;
     const isChecked = event.target.checked;
@@ -517,17 +515,14 @@ function App() {
 
 
 
-    const formData = new FormData();
-    formData.append('pvalue', pvalue)
-    formData.append('fold_up', foldup)
-    formData.append('fold_down', folddown)
-    formData.append('dataname', selectedProjects[0])
+    const formData = build_form()
 
 
 
     try {
       const response = await fetch('/downloadall', {
         method: 'POST',
+        'Content-Type': 'multipart/form-data',
         responseType: 'blob',
         body: formData
       });
@@ -560,6 +555,26 @@ function App() {
   const [group1_name, setGroup1_name] = useState(null);
   const [group2_name, setGroup2_name] = useState(null);
 
+  const [pairwiseCompareMethod, setPairwiseCompareMethod] = useState('permutation-test');
+  const [multipleCompareCorrectionMethod, setMultipleCompareCorrectionMethod] = useState('FDR');
+  const [fdr_alpha, setfdr_alpha] = useState(0.05);
+
+
+  const handlePairwiseCompareMethodSelect = async (event) => {
+    event.preventDefault();
+    setIsVisible_paramsInputDiv(false)
+    setPairwiseCompareMethod(event.target.value)
+
+  };
+  const handleMultipleCompareCorrectionMethodSelect = async (event) => {
+    event.preventDefault();
+    setIsVisible_paramsInputDiv(false)
+    setMultipleCompareCorrectionMethod(event.target.value)
+
+  };
+
+
+
 
 
   const handleGroup1NameSelect = async (event) => {
@@ -575,7 +590,28 @@ function App() {
     setGroup2_name(event.target.value)
 
   };
+  function build_form()
+  {
 
+    const formData = new FormData();
+    formData.append('pvalue', pvalue)
+    formData.append('fold_up', foldup)
+    formData.append('fold_down', folddown)
+    formData.append('group1_name', group1_name)
+    formData.append('group2_name', group2_name)
+    formData.append('pairwiseCompareMethod', pairwiseCompareMethod)
+    formData.append('multipleCompareCorrectionMethod', multipleCompareCorrectionMethod)
+    formData.append('fdr_alpha', fdr_alpha)
+
+    formData.append('distanceLabel', distanceLabel)
+    formData.append('numOfSlices', numOfSlices)
+
+    //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
+    formData.append('color', checkedColors[0])
+    formData.append('dataname', selectedProjects[0])
+    console.log('distanceLabel',formData.get('distanceLabel'))
+    return formData
+  }
 
   const handleUpdateParams = async (event) => {
     event.preventDefault();
@@ -601,19 +637,7 @@ function App() {
     setColor_basic(color_basic_const)
     setColor_minus(color_minus_const)
     setColor_fraction(color_fraction_const)
-
-    const formData = new FormData();
-    formData.append('pvalue', pvalue)
-    formData.append('fold_up', foldup)
-    formData.append('fold_down', folddown)
-    formData.append('group1_name', group1_name)
-    formData.append('group2_name', group2_name)
-
-    //formData.append('color', significantRegions[Object.keys(selectedSignificantRegionRows)[0]]['color'])
-    formData.append('color', "UPDATE")
-    formData.append('dataname', selectedProjects[0])
-    console.log(group1_name)
-    console.log(group2_name)
+    const formData = build_form()
 
 
     try {
@@ -641,7 +665,8 @@ function App() {
       setColor_basic(temp_color_basic)
       setColor_minus(temp_color_minus)
       setColor_fraction(temp_color_fraction)
-
+      setNumOfRegionsWithZero(data['region_ids_with_all_zero'])
+      
       setFoldup_cur(foldup)
       setFolddown_cur(folddown)
       setPvalue_cur(pvalue)
@@ -655,8 +680,14 @@ function App() {
 
     }
   };
+  const pairwiseCompareMethods = ['t-test', 'permutation-test']
+  const multipleCompareCorrectionMethods = ['None', 'FDR']
 
 
+  const [numOfRegionsWithZero, setNumOfRegionsWithZero] = useState(0);
+
+  const [numOfSlices, setNumOfSlices] = useState(10);
+  const [distanceLabel, setDistanceLabel] = useState(false);
   const color_basic_const = { 'SST': { 'up': 0, 'down': 0 }, 'PV': { 'up': 0, 'down': 0 }, 'cfos': { 'up': 0, 'down': 0 }, 'cfos total': { 'up': 0, 'down': 0 } }
   const color_minus_const = { 'SST-PV-cfos': { 'up': 0, 'down': 0 }, 'SST-cfos': { 'up': 0, 'down': 0 }, 'PV-cfos': { 'up': 0, 'down': 0 }, 'SST-PV': { 'up': 0, 'down': 0 } }
   const color_fraction_const = { 'SST-PV/cfos fraction': { 'up': 0, 'down': 0 }, 'SST/cfos fraction': { 'up': 0, 'down': 0 }, 'PV/cfos fraction': { 'up': 0, 'down': 0 } }
@@ -690,6 +721,16 @@ function App() {
 
   const upArrowUnicode = '\u2191';
   const downArrowUnicode = '\u2193';
+
+
+  useEffect(() => {
+    setCheckedColors([])
+    //const f = build_form()
+    //
+    // console.log(f.get('distanceLabel'))
+    //console.log(build_form()['numOfSlices'])
+  }, [distanceLabel, numOfSlices])
+
 
   return (
 
@@ -748,7 +789,7 @@ function App() {
         </table>
       </div>
       <div className="collapsible-header" onClick={toggleVisibility_basic}>
-        <span><b>Basic Statistics</b></span>
+        <span><b>Overall Information about the data</b></span>
         <span className={`arrow ${isVisible_basic ? 'up' : 'down'}`}>
           {isVisible_basic ? '▲' : '▼'}
         </span>
@@ -808,7 +849,7 @@ function App() {
 
         <form >
 
-          <b>Group1:</b>;&nbsp;
+          <b>Group1:</b>&nbsp;
           <select
             value={group1_name} // ...force the select's value to match the state variable...
             onChange={e => handleGroup1NameSelect(e)} // ... and update the state variable on any change!
@@ -820,7 +861,7 @@ function App() {
                 <option style={{ cursor: isLoading ? 'wait' : 'default' }} name={item} key={item} value={item}>{item}</option>
               ))}
           </select>&nbsp;&nbsp;
-          <b>Group2:</b>;&nbsp;
+          <b>Group2:</b>&nbsp;
           <select
             value={group2_name} // ...force the select's value to match the state variable...
             onChange={e => handleGroup2NameSelect(e)} // ... and update the state variable on any change!
@@ -833,27 +874,105 @@ function App() {
               ))}
           </select>
 
+
           <table border='1px'>
             <thead></thead>
             <tbody>
               <tr padding='20px'>
                 <td padding='20px'>
-                  Fold(Group1/Group2) &#8805; <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "50px" }} />
-                  &nbsp; in green
+                  <span style={{ color: 'green' }}>Fold(Group1/Group2) &#8805; </span>  <input type="number" onChange={handleFoldupChange} name='fold_up' value={foldup} style={{ width: "60px",color: 'green',textAlign: 'center'   }} />
+                  
                 </td>
                 <td padding='20px'>
-                  Fold(Group1/Group2) &#8804; <input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "50px" }} />
-                  &nbsp; in red
+                  <span style={{ color: 'red' }}>Fold(Group1/Group2) &#8804; </span><input type="number" onChange={handleFolddownChange} name='fold_down' value={folddown} style={{ width: "60px",color: 'red',textAlign: 'center'  }} />
+                  
+                </td>
+
+              </tr>
+
+
+            </tbody>
+          </table>
+          <table border='1px'>
+            <thead></thead>
+            <tbody>
+              <tr>
+                <td>Pairwise comparison</td>
+                <td>Multiple comparison correction</td>
+                  <td rowSpan='2' style={{verticalAlign:'middle'}}>
+                P-value &#60;  <input type="number" onChange={handlePvalueChange} name='pvalue'  style={{ width: "60px",color: 'black',textAlign: 'center'  }} value={pvalue} />
+
+                </td>
+                <td rowSpan='2'  style={{verticalAlign:'middle'}}>               <input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"UPDATE"} name={"UPDATE"} value={"UPDATE"}
+                    onClick={handleUpdateParams}
+                  ></input></td>
+              </tr>
+
+            
+              <tr padding='20px'>
+                <td padding='20px'>
+                  <select
+                    value={pairwiseCompareMethod} // ...force the select's value to match the state variable...
+                    onChange={e => handlePairwiseCompareMethodSelect(e)} // ... and update the state variable on any change!
+                  >
+
+                    {pairwiseCompareMethods &&
+                      pairwiseCompareMethods.map(item => (
+
+                        <option style={{ cursor: isLoading ? 'wait' : 'default' }} name={item} key={item} value={item}>{item}</option>
+                      ))}
+                  </select>
                 </td>
                 <td padding='20px'>
-                  P-value &#8804; <input type="number" onChange={handlePvalueChange} name='pvalue' style={{ width: "50px" }} value={pvalue} />
+                  <select
+                    value={multipleCompareCorrectionMethod} // ...force the select's value to match the state variable...
+                    onChange={e => handleMultipleCompareCorrectionMethodSelect(e)} // ... and update the state variable on any change!
+                  >
+
+                    {multipleCompareCorrectionMethods &&
+                      multipleCompareCorrectionMethods.map(item => (
+
+                        <option style={{ cursor: isLoading ? 'wait' : 'default' }} name={item} key={item} value={item}>{item}</option>
+                      ))}
+                  </select>
+                  {
+                    multipleCompareCorrectionMethod == 'FDR' &&
+                    <>&nbsp;
+                      &#60; <input type="number" onChange={e => setfdr_alpha(e.target.value)} name='fdr_alphaalue' style={{ width: "50px" }} value={fdr_alpha} />
+                    </>
+                  }
+
+
+                </td>
+                
+  
+              </tr>
+
+
+            </tbody>
+          </table>
+          <hr></hr>
+          <table border='1px'>
+            <thead>
+
+
+            </thead>
+            <tbody>
+              <tr padding='20px'>
+                <td padding='20px'>
+
+                  Render distance label: &nbsp; <input type="checkbox" checked = {distanceLabel} onChange={e => setDistanceLabel(e.target.checked)} name='distanceLabel' style={{ width: "50px" }}/>
+
+                </td>
+                <td padding='20px'>
+                  
+                  The number of slices: &nbsp; <input type="number" onChange={e => setNumOfSlices(e.target.value)} name='numOfSlices' style={{ width: "50px" }} value={numOfSlices} />
+
+
 
                 </td>
                 <td>
 
-                  <input style={{ cursor: isLoading ? 'wait' : 'default' }} type="button" id={"UPDATE"} name={"UPDATE"} value={"UPDATE"}
-                    onClick={handleUpdateParams}
-                  ></input>
 
 
                 </td>
@@ -865,9 +984,13 @@ function App() {
 
 
           <div ref={paramsInputDiv} style={{ cursor: isLoading ? 'wait' : 'default', display: isVisible_paramsInputDiv ? 'block' : 'none' }}>
+                          The number of regions with all zero: {numOfRegionsWithZero}
+              
             <br></br>
             <div key='fold params'>Current parameters settings: <br></br>Group1 = {group1_name}, Group2 = {group2_name}, fold up = {foldup_cur}, fold down = {folddown_cur}, pvalue = {pvalue_cur}</div>
             <br></br>
+                          
+
             {color_basic &&
               Object.keys(color_basic).map(item => (
 

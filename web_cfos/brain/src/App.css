@@ -21,7 +21,9 @@ th {
   border-right: 1px solid lightgray;
   padding: 2px 4px;
 }
-
+input{
+  text-align: 'center' 
+}
 .row_selected{
   border-bottom: 1px solid lightgray;
   border-right: 1px solid lightgray;

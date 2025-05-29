@@ -6,6 +6,7 @@ logs
 web_cfos/**/node_modules
 web_cfos/**/flask_session
 web_cfos/**/files
+web_cfos/**/projects
 *.xlsx
 *.vti
 *.npy

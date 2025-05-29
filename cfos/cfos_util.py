@@ -51,8 +51,7 @@ fileHandler.suffix = "-%Y%m%d"
 fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
 
-def filename_from_params(group1_name, group2_name, pvalue_th, fold_up, fold_down):
-    return f'{group1_name}_{group2_name}_p_{str(pvalue_th)}_up_{str(fold_up)}_down_{str(fold_down)}'
+
 def sanitize_folder_name(folder_name):
   """Sanitizes a folder name by replacing invalid characters with underscores."""
   # Replace invalid characters with underscores
@@ -62,6 +61,49 @@ def sanitize_folder_name(folder_name):
   # Replace multiple spaces with a single space
   sanitized_name = re.sub(r'\s+', ' ', sanitized_name)
   return sanitized_name
+
+
+class Cfos_params():
+    def __init__(self, request = None):
+        if request == None:
+            return 
+        self.group1_name = request.form.get('group1_name')
+        self.group2_name = request.form.get('group2_name')
+        self.pairwiseCompareMethod = request.form.get('pairwiseCompareMethod')
+        self.multipleCompareCorrectionMethod = request.form.get('multipleCompareCorrectionMethod')
+        self.fdr_alpha = request.form.get('fdr_alpha')
+        
+        self.pvalue_th = float(request.form.get('pvalue'))
+        self.fold_up = float(request.form.get('fold_up'))
+        self.fold_down = float(request.form.get('fold_down'))
+        self.color = request.form.get('color')
+        self.dataname = request.form.get('dataname')
+        
+        
+        self.dist_label = 'false' if 'distanceLabel' not in request.form else str(request.form.get('distanceLabel')).lower()
+        self.num_of_imgs_in_brain_heatmap = 10 if 'numOfSlices' not in request.form else int(request.form.get('numOfSlices'))
+        
+
+    def __str__(self):
+        items = [f"{key}: {value}" for key, value in vars(self).items()]
+        return "{" + ", ".join(items) + "}"
+    
+    def stat_test_name(self):
+        return f'{self.group1_name}_{self.group2_name}_{self.pairwiseCompareMethod}_{self.multipleCompareCorrectionMethod}_a_{str(self.fdr_alpha)}_p_{str(self.pvalue_th)}_up_{str(self.fold_up)}_down_{str(self.fold_down)}'
+    def heatpmap_vis_name(self):
+        return f'{self.dist_label}_{self.num_of_imgs_in_brain_heatmap}'
+    def stat_desc(self):
+        r = ''
+        r += f'Pairwise comparison: {self.pairwiseCompareMethod}'
+        r += ', '
+        if self.multipleCompareCorrectionMethod == 'FDR':
+            r += f'Multiple comparison correction: {self.multipleCompareCorrectionMethod} < {self.fdr_alpha}'
+        else:
+            r += f'Multiple comparison correction: {self.multipleCompareCorrectionMethod}'
+        r += ', '
+        r += f'P-value < {self.pvalue_th}'
+        return r
+
 class Cfos():
     def __init__(self, filename, output_dir='output', load_from_files = False):
         logger.info("cfos init begin")
@@ -135,13 +177,22 @@ class Cfos():
         return summary
 
 
-
+    def region_ids_to_dataframe(self, regions):
+        rows = []
+        for r_id in regions:
+            row = {}
+            row["Region ID"] = r_id
+            row["Region Name"] = self.region_id_2_name[r_id]
+            row["TG Number"] = self.region_id_2_tg_id[r_id]
+            rows.append(row)
+        return pd.DataFrame(rows)
     def build_group1_and_group2(self, df_group1_name, df_group2_name, load_from_files = False):
         df_group1 = self.df_dict[df_group1_name]
         df_group2 = self.df_dict[df_group2_name]
         filename_df_exp_veh = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}.csv'
 
         filename_df_raw = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}_by_color.csv'
+        filename_df_regions_zero = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}_zero_regions.csv'
 
         if not load_from_files or (load_from_files and not os.path.exists(filename_df_raw)):
             self.df_by_two_group_and_region = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['Region ID','Region name'] ,axis=1)], axis=1)
@@ -150,11 +201,13 @@ class Cfos():
             self.df_by_two_group_and_region.to_csv(filename_df_exp_veh)
             
 
-            #self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
+            region_ids_with_zero = self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
+            self.region_ids_to_dataframe(region_ids_with_zero).to_csv(filename_df_regions_zero, index=None)
 
             df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['TG number','Region name'] ,axis=1)], axis=1)
             #df_total.set_index('TG number', inplace=True)
             df_total.set_index('Region ID', inplace=True)
+            df_total = df_total.drop(region_ids_with_zero)
             df_total = df_total.T
             df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
             subject_id_group1 = self._get_sample_ids(df_group1_name)
@@ -169,9 +222,13 @@ class Cfos():
         self.df_by_two_group_and_region = pd.read_csv(filename_df_exp_veh)
         self._int_2_str(self.df_by_two_group_and_region)
         self.df_by_two_group_and_region.set_index('TG number', inplace=True)
+
+        logger.info(f'loaded region_ids_with_all_zero_exp_veh from : {filename_df_regions_zero}')
                 
-        
-        self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
+        self.region_ids_with_all_zero_exp_veh = pd.read_csv(filename_df_regions_zero)
+        self.region_ids_with_all_zero_exp_veh['Region ID'] = self.region_ids_with_all_zero_exp_veh['Region ID'].astype(str)  
+        self.region_ids_with_all_zero_exp_veh.set_index('Region ID', inplace=True)
+        #self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
 
         self.df_by_two_group_and_color = pd.read_csv(filename_df_raw)
         logger.info(f'two group by color data loaded from : {filename_df_raw}')
@@ -209,21 +266,21 @@ class Cfos():
         
         _tg_n = list(_df_temp[(_df_temp.sum(axis=1) == 0)].index)
         
-        self.region_ids_with_all_zero_exp_veh = []
+        region_ids_with_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
-            self.region_ids_with_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
-        logger.info(f'The number of regions with all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(self.region_ids_with_all_zero_exp_veh)}')
+            region_ids_with_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
+        logger.info(f'The number of regions with all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(region_ids_with_all_zero_exp_veh)}')
 
 
         _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
         _tg_n = list(_df_temp[~(_df_temp.sum(axis=1) == 0)].index)
-        self.region_ids_with_NOT_all_zero_exp_veh = []
+        region_ids_with_NOT_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
-            self.region_ids_with_NOT_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
-        logger.info(f'The number of regions with NOT all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(self.region_ids_with_NOT_all_zero_exp_veh)}')
+            region_ids_with_NOT_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
+        logger.info(f'The number of regions with NOT all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(region_ids_with_NOT_all_zero_exp_veh)}')
 
 
-
+        return region_ids_with_all_zero_exp_veh
         #for _c in color_list_full:
         #    _df_exp_veh_color_all = _df_exp_veh[[c for c in _df_exp_veh.columns  if len(c.split("_")) == 3 and c.split("_")[2] == _c]]
         #    s = (_df_exp_veh_color_all != 0).all(axis=1)
