@@ -303,7 +303,7 @@ def fold():
         cfos, df_fold, df_stat_test = load_object(params)
         eta = time.time() # 시간 측정
         print('loading:',int(eta-sta)," sec")
-
+        print(df_fold.index)
 
         sta = time.time() # 시간 측정
         color_2_dict_up, color_2_dict_down, df_sig_region_fold= build_dict(cfos, df_fold, df_stat_test, params)

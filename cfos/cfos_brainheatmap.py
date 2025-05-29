@@ -129,7 +129,7 @@ def build_dict(cfos, _df_fold, ptest, params: cfos_util.Cfos_params):
     logger.info("build_dict begin")
     logger.info(f"zero value regions: {len(list(cfos.region_ids_with_all_zero_exp_veh.index))}")
 
-    _df_fold = _df_fold.drop(list(cfos.region_ids_with_all_zero_exp_veh.index))
+    #_df_fold = _df_fold.drop(list(cfos.region_ids_with_all_zero_exp_veh.index))
     global df_fold
     df_fold = _df_fold
     color_2_dict_up = {}

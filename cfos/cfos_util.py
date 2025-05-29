@@ -400,7 +400,11 @@ class Cfos():
         colors = ["white", "green", "red"]  # Define colors for 0 and 1
         cmap = LinearSegmentedColormap.from_list("Binary", colors, len(colors))
 
-        plt.clf()
+
+        try:
+            plt.clf()
+        except:
+            pass
         fig, axes = plt.subplots(len(self.group_names)+1, 1,figsize=(10,len(self.group_names)*2), sharex=False)
         num_of_regions_with_all_non_zero = 0
 
