@@ -217,7 +217,42 @@ def downloadall():
 
     _stat_test_name = params.stat_test_name()
     temp_dir = DATA_FOLDER+"/"+params.dataname+"/"+_stat_test_name
-    
+    heatmap_files = []
+    for file in glob.glob(f'{temp_dir}/heatmap*'):
+        if f'_{params.heatpmap_vis_name()}_' in file and f'{params.stat_test_name()}' in file and '.png' in file:
+            heatmap_files.append(file)
+
+    output_img_filename = f'{temp_dir}/heatmap_{params.heatpmap_vis_name()}_{sanitize_folder_name(params.color)}_{_stat_test_name}.png'
+    print(output_img_filename)
+    if len(heatmap_files) == 0:
+
+        sta = time.time() # 시간 측정
+        cfos, df_fold, df_stat_test = load_object(params)
+        eta = time.time() # 시간 측정
+        print('loading: ',int(eta-sta))
+
+
+        with open(f'{temp_dir}/color_2_dict_up_{_stat_test_name}.json', 'r') as f:
+            color_2_dict_up = json.load(f)
+        with open(f'{temp_dir}/color_2_dict_down_{_stat_test_name}.json', 'r') as f:
+            color_2_dict_down = json.load(f)
+        #color_list = color_list[:1]
+
+        #color_list = color_list[:1]
+
+        #color_list = [color]
+        sta = time.time() # 시간 측정
+       
+        gen_brain_heatmap(cfos, temp_dir, df_stat_test, cfos.color_list_full, color_2_dict_up,color_2_dict_down, params, single_core_mode = False)
+
+        eta = time.time() # 시간 측정
+        print('gen_brain_heatmap: ',int(eta-sta))
+   
+
+
+
+
+
 
     sta = time.time() # 시간 측정
     _filename_sig_regions = f'{temp_dir}/heatmap_significant_regions_{_stat_test_name}.csv'
@@ -357,13 +392,13 @@ def brainheatmap():
         print('loading: ',int(eta-sta))
 
 
+    
 
-        #color_list = color_list[:1]
 
         #color_list = [color]
         sta = time.time() # 시간 측정
        
-        gen_brain_heatmap(cfos, temp_dir, df_stat_test, cfos.color_list_full, color_2_dict_up,color_2_dict_down, params)
+        gen_brain_heatmap(cfos, temp_dir, df_stat_test, cfos.color_list_full, color_2_dict_up,color_2_dict_down, params, single_core_mode = False)
 
         eta = time.time() # 시간 측정
         print('gen_brain_heatmap: ',int(eta-sta))
@@ -389,6 +424,7 @@ def brainheatmap():
     response = {
         'message': f'{params.pvalue_th} {params.fold_up} {params.fold_down}',
         'image': encoded_image,
+        
         'df':df_sig_region_fold.to_dict(orient='records'),
         #'elapsed_time': eta - sta
     }

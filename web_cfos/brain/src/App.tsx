@@ -512,6 +512,7 @@ function App() {
     console.log(checkedColors)
     setIsLoading(true)
     setCheckedColors([]);
+    setLoadingMessage('Generating brain heatmaps... If this is your first time setting these parameters, it may take a few minutes.');
 
 
 
