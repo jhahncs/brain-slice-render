@@ -425,7 +425,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
                 extent = full_extent(ax).transformed(fig.dpi_scale_trans.inverted())
                 # Alternatively,
                 # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
-                ind_file = f'{output_dir}/heatmap_{color}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+                ind_file = f'{output_dir}/heatmap_{color.replace('_r',"")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
                 fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
                 tiff_files.append(ind_file)
 
@@ -448,7 +448,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
             ax_row_index += 1
        
                     # Read the first TIFF file
-            merged_tiff_filename = f'{output_dir}/heatmap_{color}_{cut}_{"ALL"}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+            merged_tiff_filename = f'{output_dir}/heatmap_{color.replace('_r',"")}_{cut}_{"ALL"}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
             if not os.path.exists(merged_tiff_filename):
                 merged_tiff = tifftools.read_tiff(tiff_files[0])
 

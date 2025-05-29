@@ -257,7 +257,7 @@ def cal_fold(cfos, df_mean_cor_sag, g1_name, g2_name, result_filename="output/fo
             _df_total_exp_veh = pd.concat([_df_total_g1.mean(axis=0), _df_total_g2.mean(axis=0)], axis=1)
             _row_list = []
             for _i, _row in _df_total_exp_veh.iterrows():
-                print(_row)
+                
                 _row_new = {}
 
                 #_row_new['TG number'] = region_id_2_tg_id[_i]
