@@ -448,7 +448,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
             ax_row_index += 1
        
                     # Read the first TIFF file
-            merged_tiff_filename = f'{output_dir}/heatmap_{cut}_{"ALL"}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+            merged_tiff_filename = f'{output_dir}/heatmap_{color}_{cut}_{"ALL"}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
             if not os.path.exists(merged_tiff_filename):
                 merged_tiff = tifftools.read_tiff(tiff_files[0])
 
