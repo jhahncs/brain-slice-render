@@ -86,28 +86,35 @@ def newdata():
 
     try:
         if 'file' not in request.files:
-            return {'message': '파일을 선택해주세요.'}, 400
+            return {'message': 'Please choose a file'}, 400
 
         file = request.files['file']
         if file.filename == '':
-            return {'message': '파일을 선택해주세요.'}, 400
+            return {'message': 'Please choose a file'}, 400
 
         if not file or not allowed_file(file.filename.lower()):
-            return {'message': '파일을 선택해주세요.'}, 400
+            return {'message': 'Please choose a file.'}, 400
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
         
-
+    
         
                 
         output_dir = DATA_FOLDER+"/"+request.form.get('newDataName')
 
         print(output_dir)
         cfos = Cfos(filename = filepath, output_dir = output_dir, load_from_files = False)
-
+        ValidationReport = cfos.validation_report()
+        msg =''
+        if ValidationReport['TG_number'] == 'Valid':
+            msg = 'Successfully uploaded'
+        else:
+            msg = 'invalid format!'
+        
         response = {
-            'message': output_dir,
+            'message': msg,
+            'ValidationReport':ValidationReport
         }
         #sema.release() # 세마포어 릴리즈
         return jsonify(response)

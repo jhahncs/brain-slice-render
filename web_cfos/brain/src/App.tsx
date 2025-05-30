@@ -51,6 +51,8 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [groupNames, setGroupNames] = useState([]);
 
+    const [validationReport, setValidationReport] = useState({});
+
   const [preprocessSummary, setPreprocessSummary] = useState({});
   const [postprocessSummary, setPostprocessSummary] = useState(0);
   const [imageData, setImageData] = useState(1);
@@ -204,7 +206,9 @@ function App() {
 
       const data = await response.json();
       setProjects([...projects, newDataName]);
-      alert("Successfully uploaded:" + data['message']);
+      setValidationReport(data['ValidationReport'])
+      
+      alert(data['message']);
 
     } catch (error) {
       console.error('업로드 실패', error);
@@ -789,19 +793,9 @@ function App() {
           </tbody>
         </table>
       </div>
-      <div className="collapsible-header" onClick={toggleVisibility_basic}>
-        <span><b>Overall Information about the data</b></span>
-        <span className={`arrow ${isVisible_basic ? 'up' : 'down'}`}>
-          {isVisible_basic ? '▲' : '▼'}
-        </span>
-      </div>
-
-      <div className={`collapsible-content ${isVisible_basic ? 'open' : ''}`}>
-
-
-
+      <div>
         <p>
-          {preprocessSummary &&
+        {preprocessSummary &&
             (Object.keys(preprocessSummary).map((key) => (
               <div key={key}>
                 <strong>{key}: </strong> {preprocessSummary[key]}
@@ -811,6 +805,30 @@ function App() {
 
           }
         </p>
+      </div>
+              <p>
+          {validationReport &&
+            (Object.keys(validationReport).map((key) => (
+              <div style={{  'color': 'red' }} key={key}>
+                <strong>{key}: </strong> {validationReport[key]}
+              </div>
+            )
+            ))
+
+          }
+        </p>
+      <div className="collapsible-header" onClick={toggleVisibility_basic}>
+        <span><b>Regions having zero values</b></span>
+        <span className={`arrow ${isVisible_basic ? 'up' : 'down'}`}>
+          {isVisible_basic ? '▲' : '▼'}
+        </span>
+      </div>
+
+      <div className={`collapsible-content ${isVisible_basic ? 'open' : ''}`}>
+
+
+
+
         <div style={{ 'borderStyle': 'solid', 'borderWidth': '2px', 'borderColor': 'black' }}>
           <TransformWrapper
             defaultScale={1}

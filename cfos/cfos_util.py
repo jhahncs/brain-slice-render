@@ -122,28 +122,55 @@ class Cfos():
                 df_name = sanitize_folder_name(sheet.title)
                 df_temp = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
 
-                self.df_dict[df_name] = df_temp
-                wb = load_workbook(filename)
+                self.df_dict[df_name] = df_temp                
                 logger.info(f'{sheet.title} -> {df_name}')
             wb.close()
 
             for _name in self.df_dict:
                 logger.info(f"preprocessed:{_name}")
                 self.df_dict[_name] = self._proprocess(self.df_dict[_name])
-                
+
                 filename_df_temp =f'{output_dir}/df_sheet_{_name}.csv'
                 logger.info(f"{_name} sheet was saved into: {filename_df_temp}")
                 self.df_dict[_name].to_csv(filename_df_temp, index=None)
+
+
+
+
+
 
         self.df_dict = {}
         self.group_names = []
         for _i, file in enumerate(glob.glob(f'{output_dir}/df_sheet_*.csv')):
             _name = file[len(f'{output_dir}/df_sheet_'):-4]
             self.group_names.append(_name)
-            logger.info(f"{_name} sheet loaded from:{file}'")
+            logger.info(f"{_name} sheet loaded from: {file}'")
             self.df_dict[_name] = pd.read_csv(f'{file}')
             self._int_2_str(self.df_dict[_name])
+
+
+
+        
+        self.not_matched_tg_numbers = []
             
+        tg_number_list_of_list = []
+        for _name in self.df_dict:
+            tg_number_list_of_list.append(list(self.df_dict[_name]['TG number']))
+        self.tg_number_common = self.find_common_elements(tg_number_list_of_list)
+        
+        for _name in self.df_dict:
+            self.not_matched_tg_numbers.extend(set(list(self.df_dict[_name]['TG number'])).difference(set(self.tg_number_common)))
+                    
+        for _name in self.df_dict:
+            self.df_dict[_name] = self.df_dict[_name][self.df_dict[_name]['TG number'].isin(self.tg_number_common)]
+
+        logger.info(f'not_matched_tg_numbers: {", ".join(self.not_matched_tg_numbers)}')    
+        logger.info(f'tg_number_common: {", ".join(self.tg_number_common)}')   
+
+
+
+        for _i, _name in enumerate(self.group_names):
+            #print(file,_name,list(self.df_dict[_name].index))
             if _i == 0:
                 self.color_list_full = list(set([c.split("_")[1] for c in self.df_dict[_name].columns if len(c.split("_")) == 2]))
                 logger.info(f"{self.color_list_full}")
@@ -162,8 +189,56 @@ class Cfos():
         logger.info(f"group names:{self.group_names}")
         logger.info("cfos init done")
         #df_exp.head()
+    def validation_report(self):
+        response = {}
+        if len(self.not_matched_tg_numbers) > 0:
+            response['TG_number'] = f'Sheets contain different TG numbers as follows: {", ".join(self.not_matched_tg_numbers)}. Nevertheless, you can do analysis using common {len(self.tg_number_common)} of TG numbers.'
+        else:
+            response['TG_number'] = 'Valid'
+        return response
+    def isvalid(self):
+        response = {}
+        col_list = []
+        for _name in self.df_dict:
+            c = list(set([c.split("_")[1] for c in self.df_dict[_name].columns if len(c.split("_")) == 2]))
+            col_list.append(c)
+        if not self.check_lists_same_elements_sets(*col_list):
+            r = self.get_error_ement(col_list)
+            response['color_code'] =  'Sheets contain different color codes: '+r
+        else:
+            response['color_code'] = 'valid'
+        col_list = []
+        for _name in self.df_dict:
+            col_list.append(list(self.df_dict[_name]['TG number']))
+        
+        if not self.check_lists_same_elements_sets(*col_list):
+            r = self.get_error_ement(col_list)
+            response['TG_number'] = 'Sheets contain different TG numbers: '+r
+        else:
+            response['TG_number'] = 'valid'
+        return response
+    def get_error_ement(self,list_of_lists):
+        r = ''
+        _common = self.find_common_elements(list_of_lists)
+        for _list in list_of_lists:
+            r += ", ".join(set(_list).difference(set(_common)))
+            r += ', '
+            
+        return r
 
 
+    def check_lists_same_elements_sets(self,*lists):
+        if not lists:
+            return True  # Empty list of lists considered as having same elements
+        first_set = set(lists[0])
+        return all(set(lst) == first_set for lst in lists[1:])
+    def find_common_elements(self, list_of_lists):
+        if not list_of_lists:
+            return []
+
+        sets = [set(lst) for lst in list_of_lists]
+        common_elements = sets[0].intersection(*sets[1:])
+        return list(common_elements)
     def preprocess_summary(self):
         summary = OrderedDict()
         summary['color'] = ", ".join(self.color_list_full)
@@ -203,6 +278,7 @@ class Cfos():
 
             region_ids_with_zero = self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
             self.region_ids_to_dataframe(region_ids_with_zero).to_csv(filename_df_regions_zero, index=None)
+            logger.info(f'region_ids_with_zero : {region_ids_with_zero}')
 
             df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['TG number','Region name'] ,axis=1)], axis=1)
             #df_total.set_index('TG number', inplace=True)
@@ -225,14 +301,14 @@ class Cfos():
         self.df_by_two_group_and_region.set_index('TG number', inplace=True)
 
         logger.info(f'loaded region_ids_with_all_zero_exp_veh from : {filename_df_regions_zero}')
-        try:
 
+        try:
             self.region_ids_with_all_zero_exp_veh = pd.read_csv(filename_df_regions_zero)
             self.region_ids_with_all_zero_exp_veh['Region ID'] = self.region_ids_with_all_zero_exp_veh['Region ID'].astype(str)  
             self.region_ids_with_all_zero_exp_veh.set_index('Region ID', inplace=True)
-        except:
-            self.region_ids_with_all_zero_exp_veh = None
-            pass
+        except pd.errors.EmptyDataError:
+            self.region_ids_with_all_zero_exp_veh = pd.DataFrame()
+
         #self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
 
         self.df_by_two_group_and_color = pd.read_csv(filename_df_raw)
@@ -270,7 +346,7 @@ class Cfos():
         _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
         
         _tg_n = list(_df_temp[(_df_temp.sum(axis=1) == 0)].index)
-        
+        print('_get_metadata',_tg_n)
         region_ids_with_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
@@ -279,6 +355,7 @@ class Cfos():
 
         _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
         _tg_n = list(_df_temp[~(_df_temp.sum(axis=1) == 0)].index)
+        print('_get_metadata',_tg_n)
         region_ids_with_NOT_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_NOT_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
@@ -422,28 +499,36 @@ class Cfos():
         for _ax_i_ve, group_name in enumerate(self.group_names):
         #for _ax_i_ve, (veh_exp, ids) in enumerate([(0,self.subject_id_veh),(1,self.subject_id_exp)]):
             _this_df = self.df_dict[group_name]
-            
+            #print(_this_df)
             logger.info(f'{group_name}')
             ax = axes[ax_i]
             ax_i += 1
             valid_list = []
+            #print(self.color_list_full)
             for _color in self.color_list_full:
                 #for _cut in ['cor','sag']:
 
-                    _df_exp_veh_color_cor = _this_df[[c for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]]
-                    columns_new = [c.split("_")[0] + "_" + c.split("_")[1] for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]
-                    _df_exp_veh_color_cor.columns = columns_new
-                    _df_exp_veh_color = _df_exp_veh_color_cor
-                    s = (_df_exp_veh_color == 0).sum(axis=1)
+                _df_exp_veh_color_cor = _this_df[[c for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]]
+                #print([c for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color])
+                #print(_df_exp_veh_color_cor)
+                columns_new = [c.split("_")[0] + "_" + c.split("_")[1] for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]
+                #print(columns_new)
+                _df_exp_veh_color_cor.columns = columns_new
+                _df_exp_veh_color = _df_exp_veh_color_cor
+                s = (_df_exp_veh_color == 0).sum(axis=1)
 
 
-                    #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color]]
-                    #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.endswith("_"+_color) and "_"+cut+"_" in c ]]
+                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color]]
+                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.endswith("_"+_color) and "_"+cut+"_" in c ]]
 
-                    #s = (_df_exp_veh_color == 0).sum(axis=1)
-                    valid_list.append(s)
+                #s = (_df_exp_veh_color == 0).sum(axis=1)
+                valid_list.append(s)
+            
+            #df_non_zero_regions = pd.concat(valid_list, axis=1).reindex(valid_list[0].index)
+            df_non_zero_regions = pd.concat(valid_list, axis=1)
+            df_non_zero_regions.index = list(_this_df['TG number'].values)
+            
 
-            df_non_zero_regions = pd.concat(valid_list, axis=1).reindex(valid_list[0].index)
             #df_non_zero_regions.index = valid_list[0].index
             #print(df_non_zero_regions)
             df_non_zero_regions.columns = self.color_list_full
@@ -465,17 +550,19 @@ class Cfos():
             #_h.axvline(x = 0, color = 'k', linewidth = 0.1)     
             #_h.axvline(x = df_non_zero_regions.T.shape[0], color = 'k', linewidth = 0.1) 
 
-
-            ax.set_title(""+group_name+"",  x=1.04, y=0.4, fontsize=8)
+            tg_min = min(list(df_non_zero_regions.T.columns))
+            tg_max = max(list(df_non_zero_regions.T.columns))
+            ax.set_title(""+group_name+"",  x=1.08, y=0.4, fontsize=8)
             if ax_i == len(self.group_names):      
                 
-                ax.set_xlabel("TG number 1 (left) to 1398 (right)",fontsize=5)
+                ax.set_xlabel(f"TG number {tg_min} (left) to {tg_max} (right)",fontsize=5)
                 _index_ids = []
                 _index_names = []
-                for _i in df_non_zero_regions.T.columns:
-                    if int(_i) == 1 or int(_i) % 50 == 0 or int(_i)  == df_non_zero_regions.T.columns[-1]:
+                
+                for _i, v in enumerate(df_non_zero_regions.T.columns):
+                    if int(_i) == 0 or int(_i) % 50 == 0 or _i  == len(df_non_zero_regions.T.columns)-1:
                         _index_ids.append(int(_i))
-                        _index_names.append(df_non_zero_regions.T.columns[int(_i)-1])
+                        _index_names.append(v)
                 
                 ax.set_xticks(_index_ids)
                 ax.set_xticklabels(_index_names, fontsize=4, rotation=90)
