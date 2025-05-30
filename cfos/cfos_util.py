@@ -224,10 +224,14 @@ class Cfos():
         self.df_by_two_group_and_region.set_index('TG number', inplace=True)
 
         logger.info(f'loaded region_ids_with_all_zero_exp_veh from : {filename_df_regions_zero}')
-                
-        self.region_ids_with_all_zero_exp_veh = pd.read_csv(filename_df_regions_zero)
-        self.region_ids_with_all_zero_exp_veh['Region ID'] = self.region_ids_with_all_zero_exp_veh['Region ID'].astype(str)  
-        self.region_ids_with_all_zero_exp_veh.set_index('Region ID', inplace=True)
+        try:
+
+            self.region_ids_with_all_zero_exp_veh = pd.read_csv(filename_df_regions_zero)
+            self.region_ids_with_all_zero_exp_veh['Region ID'] = self.region_ids_with_all_zero_exp_veh['Region ID'].astype(str)  
+            self.region_ids_with_all_zero_exp_veh.set_index('Region ID', inplace=True)
+        except:
+            self.region_ids_with_all_zero_exp_veh = None
+            pass
         #self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
 
         self.df_by_two_group_and_color = pd.read_csv(filename_df_raw)

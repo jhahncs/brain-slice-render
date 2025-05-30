@@ -323,7 +323,11 @@ def fold():
     
 
     filename_df_regions_zero = f'{DATA_FOLDER}/{params.dataname}/df_{params.group1_name}_{params.group2_name}_zero_regions.csv'
-    df_zero_regions = pd.read_csv(filename_df_regions_zero)
+    try:
+        df_zero_regions = pd.read_csv(filename_df_regions_zero)
+    except:
+        df_zero_regions = []
+        pass
     with open(f'{temp_dir}/color_2_dict_up_{_filename_from_params}.json', 'r') as f:
         color_2_dict_up = json.load(f)
     with open(f'{temp_dir}/color_2_dict_down_{_filename_from_params}.json', 'r') as f:
