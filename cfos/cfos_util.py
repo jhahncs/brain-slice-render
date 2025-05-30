@@ -270,7 +270,7 @@ class Cfos():
         filename_df_regions_zero = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}_zero_regions.csv'
 
         if not load_from_files or (load_from_files and not os.path.exists(filename_df_raw)):
-            self.df_by_two_group_and_region = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['Region ID','Region name'] ,axis=1)], axis=1)
+            self.df_by_two_group_and_region = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1).reset_index(drop=True),df_group2.drop(['Region ID','Region name'] ,axis=1).reset_index(drop=True)], axis=1)
             self.df_by_two_group_and_region.set_index('TG number', inplace=True)
             logger.info(f'saved ({df_group1_name} and {df_group2_name}) into : {filename_df_exp_veh}')
             self.df_by_two_group_and_region.to_csv(filename_df_exp_veh)
@@ -280,7 +280,7 @@ class Cfos():
             self.region_ids_to_dataframe(region_ids_with_zero).to_csv(filename_df_regions_zero, index=None)
             logger.info(f'region_ids_with_zero : {region_ids_with_zero}')
 
-            df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['TG number','Region name'] ,axis=1)], axis=1)
+            df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1).reset_index(drop=True),df_group2.drop(['TG number','Region name'] ,axis=1).reset_index(drop=True)], axis=1)
             #df_total.set_index('TG number', inplace=True)
             df_total.set_index('Region ID', inplace=True)
             if len(region_ids_with_zero) > 0:
@@ -346,7 +346,6 @@ class Cfos():
         _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
         
         _tg_n = list(_df_temp[(_df_temp.sum(axis=1) == 0)].index)
-        print('_get_metadata',_tg_n)
         region_ids_with_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
@@ -355,7 +354,6 @@ class Cfos():
 
         _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
         _tg_n = list(_df_temp[~(_df_temp.sum(axis=1) == 0)].index)
-        print('_get_metadata',_tg_n)
         region_ids_with_NOT_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_NOT_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
