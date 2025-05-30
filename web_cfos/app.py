@@ -107,7 +107,7 @@ def newdata():
         cfos = Cfos(filename = filepath, output_dir = output_dir, load_from_files = False)
         ValidationReport = cfos.validation_report()
         msg =''
-        if ValidationReport['TG_number'] == 'Valid':
+        if ValidationReport['TG number consistent check'] == 'Valid':
             msg = 'Successfully uploaded'
         else:
             msg = 'invalid format!'
