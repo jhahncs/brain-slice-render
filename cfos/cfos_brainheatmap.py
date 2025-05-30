@@ -127,7 +127,7 @@ def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, 
 df_fold = None
 def build_dict(cfos, _df_fold, ptest, params: cfos_util.Cfos_params):
     logger.info("build_dict begin")
-    logger.info(f"zero value regions: {len(list(cfos.region_ids_with_all_zero_exp_veh.index))}")
+    #logger.info(f"zero value regions: {len(list(cfos.region_ids_with_all_zero_exp_veh.index))}")
 
     #_df_fold = _df_fold.drop(list(cfos.region_ids_with_all_zero_exp_veh.index))
     global df_fold

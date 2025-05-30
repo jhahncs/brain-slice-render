@@ -207,7 +207,8 @@ class Cfos():
             df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1),df_group2.drop(['TG number','Region name'] ,axis=1)], axis=1)
             #df_total.set_index('TG number', inplace=True)
             df_total.set_index('Region ID', inplace=True)
-            df_total = df_total.drop(region_ids_with_zero)
+            if len(region_ids_with_zero) > 0:
+                df_total = df_total.drop(region_ids_with_zero)
             df_total = df_total.T
             df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
             subject_id_group1 = self._get_sample_ids(df_group1_name)
