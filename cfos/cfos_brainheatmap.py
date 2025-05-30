@@ -331,7 +331,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
     #fig, axs = plt.subplots(2,7, figsize=(30, 10))
     fig.suptitle(f'{color_code}  {params.group1_name} / {params.group2_name}', fontsize=20)
     spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap + 1, nrows=8, 
-                             width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.2], 
+                             width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.15], 
                              height_ratios = [1,1,1,0.2,1,1,1,0.2], 
                             # height_ratios = [1,1,1,0.2,1,1,1,0.2,0.8], 
 

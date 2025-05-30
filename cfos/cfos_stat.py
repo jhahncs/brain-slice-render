@@ -70,6 +70,7 @@ def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
         if test_mode:
             pvalues = [random.random() for i in range(len(_region_ids))]
         else:
+            logger.info("@@@@@@@@@@ "+p_or_t)
             res = stats.permutation_test((group_exp, group_veh), mystatistic, n_resamples= 500,random_state = None)
             pvalues = res.pvalue
       
@@ -77,6 +78,8 @@ def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
         if test_mode:
             pvalues = [random.random() for i in range(len(_region_ids))]
         else:
+            logger.info("@@@@@@@@@@ "+p_or_t)
+
             t_stat, pvalues = stats.ttest_ind(group_exp, group_veh)
       
 
@@ -97,7 +100,8 @@ def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
 
   
 
-def cal_pvalue(cfos,_df_agg, test_method, result_filename_permutation='output/pvalue_permutation.csv', sigle_core_mode = False, test_mode = False):
+def cal_pvalue(cfos,_df_agg, test_method, result_filename_permutation='output/pvalue_permutation.csv',
+                sigle_core_mode = False, test_mode = False):
 
     region_id_2_tg_id = cfos.region_id_2_tg_id
     region_id_2_name = cfos.region_id_2_name
