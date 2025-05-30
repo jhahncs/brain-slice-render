@@ -163,7 +163,7 @@ class Cfos():
                     
         for _name in self.df_dict:
             self.df_dict[_name] = self.df_dict[_name][self.df_dict[_name]['TG number'].isin(self.tg_number_common)]
-
+        self.not_matched_tg_numbers = list(set(self.not_matched_tg_numbers))
         logger.info(f'not_matched_tg_numbers: {", ".join(self.not_matched_tg_numbers)}')    
         logger.info(f'tg_number_common: {", ".join(self.tg_number_common)}')   
 
