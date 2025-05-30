@@ -192,9 +192,9 @@ class Cfos():
     def validation_report(self):
         response = {}
         if len(self.not_matched_tg_numbers) > 0:
-            response['TG_number'] = f'Sheets contain different TG numbers as follows: {", ".join(self.not_matched_tg_numbers)}. Nevertheless, you can do analysis using common {len(self.tg_number_common)} of TG numbers.'
+            response['TG number consistent check'] = f'Sheets contain different TG numbers as follows: {", ".join(self.not_matched_tg_numbers)}. Nevertheless, you can do analysis using common {len(self.tg_number_common)} of TG numbers.'
         else:
-            response['TG_number'] = 'Valid'
+            response['TG number consistent check'] = 'Valid'
         return response
     def isvalid(self):
         response = {}

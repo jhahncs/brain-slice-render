@@ -196,10 +196,11 @@ def load_object(params: Cfos_params):
 
     cfos = Cfos(None, DATA_FOLDER+"/"+params.dataname, load_from_files=True)
     cfos.build_group1_and_group2(params.group1_name, params.group2_name, load_from_files = True)
-
-    df_fold = cal_fold(cfos, cfos.df_by_two_group_and_color, params.group1_name, params.group2_name,DATA_FOLDER+"/"+params.dataname+"/fold.csv")
-    
     stat_name = params.stat_test_name()
+    filename_fold= f'{DATA_FOLDER}/{params.dataname}/{stat_name}/fold.csv'
+
+    df_fold = cal_fold(cfos, cfos.df_by_two_group_and_color, params.group1_name, params.group2_name, filename_fold)
+    
     filename_pairwiseCompare= f'{DATA_FOLDER}/{params.dataname}/{stat_name}/pairwise_{params.pairwiseCompareMethod}.csv'
 
     df_pairwise_test = cal_pvalue(cfos,cfos.df_by_two_group_and_color, params.pairwiseCompareMethod,filename_pairwiseCompare, sigle_core_mode = False, test_mode = False)

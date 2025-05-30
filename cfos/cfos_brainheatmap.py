@@ -330,7 +330,12 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
     fig = plt.figure(figsize=(25*(params.num_of_imgs_in_brain_heatmap/20), 10))
     #fig, axs = plt.subplots(2,7, figsize=(30, 10))
     fig.suptitle(f'{color_code}  {params.group1_name} / {params.group2_name}', fontsize=20)
-    spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap+1, nrows=9, width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.1], height_ratios = [1,1,1,0.2,1,1,1,0.2,0.8], wspace=0.001,
+    spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap + 1, nrows=8, 
+                             width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.2], 
+                             height_ratios = [1,1,1,0.2,1,1,1,0.2], 
+                            # height_ratios = [1,1,1,0.2,1,1,1,0.2,0.8], 
+
+                             wspace=0.001,
                             hspace=0.6)
 
     maxmin_dict = {}
@@ -441,7 +446,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
                 #cax = divider.append_axes("left", size="5%", pad=0.05)
                 cbar = fig.colorbar(
                     matplotlib.cm.ScalarMappable(norm=norm, cmap=color), cax=ax, fraction=0.046, pad=0.04
-                )
+                )   
                 for t in cbar.ax.get_yticklabels():
                     t.set_fontsize(5)
                 cbar.set_label(f'Fold \u0394\n({params.group1_name} / {params.group2_name})', fontsize=5)
@@ -462,10 +467,11 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
         
         ax = fig.add_subplot(spec[ax_row_index, :])
         ax.set_axis_off()
-        ax.axhline(color='k', linestyle='--', linewidth=2 )
+        #ax.axhline(color='k', linestyle='--', linewidth=2 )
         ax_row_index += 1
 
     ax_col_index = 0
+    '''
     ax = fig.add_subplot(spec[ax_row_index,:])
     ax.set_axis_off()
     not_visualized_regions_text = ''
@@ -473,6 +479,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
         not_visualized_regions_text += f'{not_visualized_region["Region Name"]}({not_visualized_region["Region ID"]}),'
 
     ax.text(0, 0.1, f'{len(not_visualized_regions)} regions are not visualized (mis match between TG and Altals): {not_visualized_regions_text}\n{params.stat_desc()}\nGreen color: Fold \u0394 ({params.group1_name}/{params.group2_name}) > {params.fold_up},  {len(color_2_dict_up[color_code])} regions visualized.\nRed color: Fold \u0394 ({params.group1_name}/{params.group2_name}) < {params.fold_down},  {len(color_2_dict_down[color_code])} regions visualized.\nFrontal(Rostal \u2192 Caudal), saggital, horizontal view, respectively\n',  fontsize = 8)
+    '''
     plt.tight_layout()
     #plt.show()
 
