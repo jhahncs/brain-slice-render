@@ -553,7 +553,7 @@ class Cfos():
             ax.set_title(""+group_name+"",  x=1.08, y=0.4, fontsize=8)
             if ax_i == len(self.group_names):      
                 
-                ax.set_xlabel(f"TG number {tg_min} (left) to {tg_max} (right)",fontsize=5)
+                ax.set_xlabel(f"TG number",fontsize=5)
                 _index_ids = []
                 _index_names = []
                 
