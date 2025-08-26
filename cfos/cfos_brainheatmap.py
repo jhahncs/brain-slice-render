@@ -315,8 +315,10 @@ def full_extent(ax, pad=0.0):
     return bbox.expanded(1.0 + pad, 1.0 + pad)
 
 
-def _gen_brain_heatmap(output_dir, params, ptest, color_code,
+def _gen_brain_heatmap(output_dir,params, ptest, color_code,
                        color_2_dict_up,color_2_dict_down):
+    
+    
     
     global cfos
     try:
@@ -429,8 +431,9 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
                 # Save just the portion _inside_ the second axis's boundaries
                 extent = full_extent(ax).transformed(fig.dpi_scale_trans.inverted())
                 # Alternatively,
+                os.makedirs(f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}', exist_ok=True)
                 # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
-                ind_file = f'{output_dir}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+                ind_file = f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
                 fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
                 tiff_files.append(ind_file)
 
@@ -484,7 +487,7 @@ def _gen_brain_heatmap(output_dir, params, ptest, color_code,
     #plt.show()
 
 
-    _filename = f'{output_dir}/heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.png'
+    _filename = f'{output_dir}/one_heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.png'
     fig.savefig(_filename, dpi=600, bbox_inches='tight', pad_inches=1)
     logger.info(f'brain heatmap saved into : {_filename}')
 

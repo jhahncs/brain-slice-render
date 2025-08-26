@@ -7,6 +7,9 @@ web_cfos/**/node_modules
 web_cfos/**/flask_session
 web_cfos/**/files
 web_cfos/**/projects
+web_reconst/**/flask_session
+web_reconst/**/files_temp
+web_reconst/**/files
 *.xlsx
 *.vti
 *.npy

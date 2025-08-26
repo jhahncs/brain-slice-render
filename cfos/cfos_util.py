@@ -119,6 +119,10 @@ class Cfos():
             #filename = 'resources/SST_PV_cfos_Summary_Jin_Mehdi_March25 (1).xlsx'
             wb = load_workbook(filename)
             for sheet in wb.worksheets:
+                logger.info(f"Sheet: {sheet.title}")
+                if 'Description' in str(sheet.title):
+                    logger.info(f"NOT applicable: {sheet.title}")
+                    continue
                 df_name = sanitize_folder_name(sheet.title)
                 df_temp = pd.read_excel(open(filename, 'rb'), sheet_name=sheet.title)
 
@@ -178,7 +182,7 @@ class Cfos():
                 logger.info(f"id mappings saved into: {id_mapping_filename}")
                 self.build_id_mappings(self.df_dict[_name], id_mapping_filename)
 
-            logger.info(f"{_name}: {self._get_sample_ids(_name)}")
+            logger.info(f"{_name}: _get_sample_ids: {self._get_sample_ids(_name)}")
             logger.info(f"{_name}: {len(self.df_dict[_name])} regions")
             logger.info(f"{_name}: {len(self.df_dict[_name].columns)} columns")
             logger.info(list(self.df_dict[_name].columns[:5]))
@@ -327,8 +331,8 @@ class Cfos():
 
     def _get_columns_color(self, _df, _colors):
 
-
-        return sorted(list(set([c for c in _df.columns if len(c.split("_")) == 2 and c.split("_")[1] in _colors])))
+        _columns_color = sorted(list(set([c for c in _df.columns if len(c.split("_")) == 2 and c.split("_")[1] in _colors])))            
+        return _columns_color
     
 
     def _get_sample_ids(self, group_name):
@@ -437,22 +441,54 @@ class Cfos():
 
 
     def _proprocess(self, _df):
-        for prefix in self.prefix_to_remove_column:
-            _df = _df.drop([a for a in _df.columns if a.startswith(prefix)], axis=1)
-        #df_exp = df_exp.drop([a for a in df_exp.columns if a.endswith("fraction")], axis=1)
-        _df.drop(_df[pd.isnull(_df['Region name'])].index, inplace=True)
-        _df['Region ID'] = _df['Region ID'].astype(str)    
-        if '.' in str(_df['Region ID'].values[0]):
-            _df['Region ID'] = _df['Region ID'].str[:-2]
-        _df['TG number'] = _df['TG number'].astype(int)
-        for _c in _df.columns:
-            if _c.endswith('SS/cfos fraction'):
-                _df = _df.rename(columns={_c: _c.replace('SS/cfos fraction','SST/cfos fraction')})
-                
-        _df = _df.replace('#DIV/0!',0.0)
-        _df = _df.fillna(0)
-        for _c in _df.columns[3:]:
-            _df[_c] = _df[_c].astype(float)
+        import sys
+        try:
+            for prefix in self.prefix_to_remove_column:
+                _df = _df.drop([a for a in _df.columns if a.startswith(prefix)], axis=1)
+            #df_exp = df_exp.drop([a for a in df_exp.columns if a.endswith("fraction")], axis=1)
+            _df.drop(_df[pd.isnull(_df['Region name'])].index, inplace=True)
+            _df['Region ID'] = _df['Region ID'].astype(str)    
+            if '.' in str(_df['Region ID'].values[0]):
+                _df['Region ID'] = _df['Region ID'].str[:-2]
+            _df['TG number'] = _df['TG number'].astype(int)
+            for _c in _df.columns:
+                if _c.endswith('SS/cfos fraction'):
+                    _df = _df.rename(columns={_c: _c.replace('SS/cfos fraction','SST/cfos fraction')})
+                    
+            _df = _df.replace('#DIV/0!',0.0)
+            _df = _df.fillna(0)
+            for _c in _df.columns[3:]:
+                _df[_c] = _df[_c].astype(float)
+            
+
+            # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
+            cfos_levels = [col.split('_')[-1] for col in _df.columns if len(col.split('_')) >= 2]
+            sample_ids = [col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]
+
+            # 삭제할 열 이름을 담을 리스트
+            cols_to_drop = []
+
+            # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
+            for s in sample_ids:
+                for level in cfos_levels:
+                    cor_col = f'{s}_cor_{level}'
+                    sag_col = f'{s}_Sag_{level}'
+                    avg_col = f'{s}_{level}'
+                    
+                    # 두 열의 평균을 계산하여 새로운 열에 할당
+                    _df[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
+                    
+                    # 삭제할 열 이름 리스트에 추가
+                    cols_to_drop.extend([cor_col, sag_col])
+
+            # 기존 열들을 삭제
+            _df.drop(columns=cols_to_drop, inplace=True)
+            print(_df)
+        except Exception as e:
+            exc_type, exc_obj, tb = sys.exc_info()
+            line_number = tb.tb_lineno
+            print(f"Exception occurred on line: {line_number} {exc_type} {exc_obj}")
+
         return _df
 
     def build_id_mappings(self, _df, id_mapping_filename):
@@ -498,7 +534,7 @@ class Cfos():
         #for _ax_i_ve, (veh_exp, ids) in enumerate([(0,self.subject_id_veh),(1,self.subject_id_exp)]):
             _this_df = self.df_dict[group_name]
             #print(_this_df)
-            logger.info(f'{group_name}')
+            logger.info(f'group_name: {group_name}')
             ax = axes[ax_i]
             ax_i += 1
             valid_list = []
