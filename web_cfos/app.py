@@ -263,6 +263,49 @@ def downloadall():
 
 
     sta = time.time() # 시간 측정
+    zip_file_name = f"files/{str(sta)}_{_stat_test_name}.zip"
+
+
+
+    # 메모리 버퍼를 사용하여 압축 파일 생성
+    memory_file = io.BytesIO()
+
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as myzip:
+        # 1. 기존에 압축하려던 파일들을 추가
+        '''
+        files_to_zip = []
+        _filename_sig_regions = os.path.join(temp_dir, f'heatmap_significant_regions_{_stat_test_name}.csv')
+        files_to_zip.append(_filename_sig_regions)
+        for file in glob.glob(f'{temp_dir}/heatmap*'):
+            if f'_{params.heatpmap_vis_name()}_' in file and f'{params.stat_test_name()}' in file:
+                files_to_zip.append(file)
+                
+        for file_path in files_to_zip:
+            if os.path.exists(file_path):
+                arcname = os.path.relpath(file_path, temp_dir)
+                myzip.write(file_path, arcname=arcname)
+        '''
+        # 2. temp_dir 내 모든 하위 폴더와 파일들을 재귀적으로 추가
+        for dirpath, dirnames, filenames in os.walk(temp_dir):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                # 기존에 추가한 파일은 건너뛰기
+                if 'color_2_dict_' in file_path:
+                    continue
+                #if file_path not in files_to_zip:
+                arcname = os.path.relpath(file_path, temp_dir)
+                myzip.write(file_path, arcname=arcname)
+
+    memory_file.seek(0)
+
+    # ZIP 파일을 실제 디스크에 저장
+    with open(zip_file_name, 'wb') as file:
+        file.write(memory_file.read())
+
+    #memory_file.close()
+
+
+    '''
     _filename_sig_regions = f'{temp_dir}/heatmap_significant_regions_{_stat_test_name}.csv'
 
     txtfiles = []
@@ -270,20 +313,50 @@ def downloadall():
     for file in glob.glob(f'{temp_dir}/heatmap*'):
         if f'_{params.heatpmap_vis_name()}_' in file and f'{params.stat_test_name()}' in file:
             txtfiles.append(file)
+
     memory_file = io.BytesIO()
-    zip_file_name = f"files/{str(sta)}_{_stat_test_name}.zip"
+    
+    for file_path in txtfiles:
+        if os.path.exists(file_path):
+            arcname = os.path.relpath(file_path, temp_dir)
+            myzip.write(file_path, arcname=arcname)
+    
+    # 2. temp_dir 내 모든 하위 폴더와 파일들을 재귀적으로 추가
+    for dirpath, dirnames, filenames in os.walk(temp_dir):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            # 기존에 추가한 파일은 건너뛰기
+            if file_path not in txtfiles:
+                arcname = os.path.relpath(file_path, temp_dir)
+                myzip.write(file_path, arcname=arcname)
+
     with zipfile.ZipFile(memory_file, 'w') as myzip:
     # Add files to the archive
-        for t in txtfiles:
-            myzip.write(t,arcname=t.replace(temp_dir,""))
+        for file_path in txtfiles:
+            #myzip.write(t,arcname=t.replace(temp_dir,""))
+
+            if os.path.exists(file_path):
+                # ZIP 파일 내부에 저장될 경로를 'temp_dir' 기준으로 상대 경로로 설정합니다.
+                # 이렇게 하면 'temp_dir/slices/file.txt'는 'slices/file.txt'로 저장됩니다.
+                arcname = os.path.relpath(file_path, temp_dir)
+                myzip.write(file_path, arcname=arcname)
+            else:
+                print(f"경고: 파일을 찾을 수 없어 압축에서 제외되었습니다: {file_path}")
+
+
     memory_file.seek(0)
+    
     with open(zip_file_name, 'wb') as file:
         file.write(memory_file.read())
+    '''
+    
     memory_file.seek(0)
-    eta = time.time() # 시간 측정
-    print('zip:',int(eta-sta))
+    
     hostname = request.headers.get('Host')
     print(zip_file_name)
+
+    
+
     if zip_file_name:   
         #secure_filename = secure_filename(f'{str(sta)}_{output_dir}_{_filename_from_params}.zip')
         #uploads_dir = os.path.join(app.root_path, 'files')
@@ -394,7 +467,7 @@ def brainheatmap():
     eta = time.time() # 시간 측정
     print('build_dict: ',int(eta-sta))
 
-    output_img_filename = f'{temp_dir}/heatmap_{params.heatpmap_vis_name()}_{sanitize_folder_name(params.color)}_{_stat_test_name}.png'
+    output_img_filename = f'{temp_dir}/one_heatmap_{params.heatpmap_vis_name()}_{sanitize_folder_name(params.color)}_{_stat_test_name}.png'
     print(output_img_filename)
     if not os.path.exists(output_img_filename):
 
@@ -409,8 +482,8 @@ def brainheatmap():
 
         #color_list = [color]
         sta = time.time() # 시간 측정
-       
-        gen_brain_heatmap(cfos, temp_dir, df_stat_test, cfos.color_list_full, color_2_dict_up,color_2_dict_down, params, single_core_mode = False)
+        #os.makedirs(temp_dir + "/slices", exist_ok=True)
+        gen_brain_heatmap(cfos, temp_dir ,  df_stat_test, cfos.color_list_full, color_2_dict_up,color_2_dict_down, params, single_core_mode = False)
 
         eta = time.time() # 시간 측정
         print('gen_brain_heatmap: ',int(eta-sta))
