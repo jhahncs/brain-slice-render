@@ -8,6 +8,7 @@ from vtk.util import numpy_support
 import multiprocessing
 from utils import slice_util
 import trimesh
+from tqdm import tqdm # 1. tqdm 라이브러리를 임포트합니다.
 def gen_random_rotated_vol(_vol_norm, max_rotation_x_angle = 20):
     #print('gen_random_rotated_vol')
     
@@ -36,9 +37,9 @@ def gen_random_rotated_vol(_vol_norm, max_rotation_x_angle = 20):
     #print(np.min(_points_vol_norm_rotated, axis=0))
 
     [xmin,xmax, ymin,ymax, zmin,zmax] = _vol_norm_rotated.bounds()
-    return _vol_norm_rotated, [xmin,xmax, ymin,ymax, zmin,zmax] 
+    return _vol_norm_rotated, [xmin,xmax, ymin,ymax, zmin,zmax] , (_rotate_x,_rotate_y,_rotate_z)
 
-def create_slicing_box(bounds , num_of_slices, slice_index, slice_tickness, max_slice_tickness, smallest_tickness):
+def create_slicing_box(no_gap_between_slices,bounds , num_of_slices, slice_index, slice_tickness, max_slice_tickness, smallest_tickness):
     top_missing = 0
     bottom_missing = 0
     if max_slice_tickness > 0:
@@ -51,12 +52,16 @@ def create_slicing_box(bounds , num_of_slices, slice_index, slice_tickness, max_
         top_missing = smallest_tickness
     if bottom_missing == 0.0:
         bottom_missing = smallest_tickness
-    
+    if no_gap_between_slices:
+        top_missing = 0
+        bottom_missing = 0
     #_color = 'red5'
     [xmin,xmax, ymin,ymax, zmin,zmax] = bounds
     # slice_index == 0: # the bottom object
     top_box = Box(pos=(xmin,ymax ,zmin), size=((xmax-xmin)*2, ( (num_of_slices-slice_index-1)*slice_tickness + top_missing)*2 , (zmax-zmin)*2))
     bottom_box = Box(pos=(xmin,ymin,zmin), size=((xmax-xmin)*2, (slice_index*slice_tickness + bottom_missing)*2 , (zmax-zmin)*2))
+    #print('top_box',top_box)
+    #print('bottom_box',bottom_box)
     return top_box, bottom_box
 def cal_slice_tickness(bounds, num_of_slices):
     [_,_, ymin,ymax, _,_] = bounds
@@ -81,21 +86,29 @@ def cut_with_bounds(_vol, top_box, bottom_box):
     return _cut
 
     global _vol_norm
-def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smallest_tickness = 1, max_rotation_x_angle = 20, ply_gen=False):
+def process_task(_dir_surfix, no_gap_between_slices, num_of_slices, vol_index, max_slice_tickness, smallest_tickness = 1, max_rotation_x_angle = 20, ply_gen=False):
     global DEBUG
 
 
-    _dir = f'{_dir_surfix}_{vol_index}/fractured_0'    
-    os.makedirs(_dir, exist_ok=True)
-    print(_dir)
+       
+    
+   
 
 
     
-    _vol_norm_rotated, bounds = gen_random_rotated_vol(_vol_norm, max_rotation_x_angle)   
+    _vol_norm_rotated, bounds, (rotate_x, rotate_y, rotate_z) = gen_random_rotated_vol(_vol_norm, max_rotation_x_angle)   
     [xmin,xmax, ymin,ymax, zmin,zmax] = bounds
     
+    
     slice_tickness = cal_slice_tickness(bounds, num_of_slices)
-
+    num_of_missing_slices = 0
+    is_curvature = True
+    start_data_id = 0
+    end_data_id = 100
+    
+    _dir = f'{_dir_surfix}/sliced_on_{rotate_x:.3f}_{rotate_y:.3f}_{rotate_z:.3f}_{slice_tickness:.4f}_{no_gap_between_slices}_{num_of_missing_slices}_{start_data_id}_{is_curvature}_{end_data_id}_ATLAS_{num_of_slices}/fractured_0' 
+    os.makedirs(_dir, exist_ok=True)
+    print(_dir)
     if DEBUG:
         print('slice_tickness',slice_tickness)
         print('max_slice_tickness',max_slice_tickness)
@@ -125,7 +138,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smal
         _color = _cmaps[slice_index]
         #print(f'{_dir}/piece_{slice_index}.obj')
 
-        top_box, bottom_box = create_slicing_box(bounds, num_of_slices, slice_index, slice_tickness, max_slice_tickness, smallest_tickness)
+        top_box, bottom_box = create_slicing_box(no_gap_between_slices, bounds, num_of_slices, slice_index, slice_tickness, max_slice_tickness, smallest_tickness)
         #_points_top_box = numpy_support.vtk_to_numpy(top_box.dataset.GetPoints().GetData())
         #_points_bottom_box = numpy_support.vtk_to_numpy(top_box.dataset.GetPoints().GetData())
         #top_box.scale(s=(1,0.8,1))
@@ -156,6 +169,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smal
         '''
         _vol_norm_rotated_slice = cut_with_bounds(_vol_norm_rotated,top_box,bottom_box)#.cut_with_box(top_box.bounds(), invert=True).cut_with_box(bottom_box.bounds(), invert=True).color('red5', 0.8)
         _vol_norm_rotated_slice_pts = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
+        print('slice',slice_index,len(_vol_norm_rotated_slice_pts))
         _vol_norm_rotated_slice = Points(_vol_norm_rotated_slice_pts).color(_color, slice_color_alpha)
         #_vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
         if DEBUG:
@@ -217,7 +231,7 @@ random.seed(81)
 random.shuffle(_cmaps)
 
 
-if True:
+if False:
     #meshes = load_obj('resources/allen_mouse_100um_v1.2.obj')[0]
     #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/1089.obj')[0]
     #meshes = load_obj('C:/Users/jhahn/.brainglobe/allen_mouse_100um_v1.2/meshes/375.obj')[0]
@@ -239,13 +253,20 @@ if True:
     #print('obj loaded')
     #_vol = meshes.normalize().wireframe().binarize()
     _vol = meshes.wireframe().binarize(dims=[500,500,500])
-    save(_vol, 'resources/reduced_vol.vti',binary=True)
+    xyz_list = numpy_support.vtk_to_numpy(_vol.dataset.GetPoints().GetData())
+
+
+    _vol_subdivde = meshes.subdivide(n=2).wireframe().binarize(dims=[500,500,500])
+    xyz_list_subdivde = numpy_support.vtk_to_numpy(_vol_subdivde.dataset.GetPoints().GetData())
+
+    print('xyz_list',len(xyz_list))
+    print('xyz_list_subdivde',len(xyz_list_subdivde))
+    #save(_vol, 'resources/reduced_vol.vti',binary=True)
     #print('converted into voxel')
-
-
-
 else:
     _vol = Volume('resources/reduced_vol.vti')
+
+#exit()
 data_home_dir = '/data/jhahn/data/shape_dataset/data/atlas_mouse_brain_50mm'
 num_of_slices = 20
 max_slice_tickness = 50
@@ -318,7 +339,7 @@ DEBUG = False
 
 
 if DEBUG:
-    mesh_obj_dict = process_task("output", num_of_slices = num_of_slices, vol_index = 0, max_slice_tickness = max_slice_tickness)
+    mesh_obj_dict = process_task("output", no_gap_between_slices = True, num_of_slices = num_of_slices, vol_index = 0, max_slice_tickness = max_slice_tickness)
 else:
 
     num_of_slices_list = []
@@ -329,24 +350,26 @@ else:
     smallest_tickness_list = []
     max_rotation_x_angle_list = []
     #for num_of_slices in range(6,15):
-
+    no_gap_between_slices_list = [True]
+    tasks_to_run = []
 
     #for surfix, vol_index in [('train',1000),('val',100)]:
     #for surfix, num_of_samples, ply_gen_mod in [('train',1000, False),('val',100, False),('test',100, True)]:
-    for num_of_samples in [100]:
+    for num_of_samples in [3]:
         for max_tickness in [50]:
-            for num_of_slices in [20]:
-                _dir_surfix = f'{data_home_dir}/sliced_on_1_0_0_0.003_True_5_100_True_209_HIP'
-                os.makedirs(_dir_surfix, exist_ok=True)
-                for vol_index in range(num_of_samples):
-                    dir_surfix_list.append(_dir_surfix)
-                    num_of_slices_list.append(num_of_slices)
-                    vol_index_list.append(vol_index)
-                    max_tickness_list.append(max_tickness)
-                    smallest_tickness_list.append(1)
-                    max_rotation_x_angle_list.append(80)
-                    ply_gen_mode_list.append(True)
-
+            for no_gap_between_slices in no_gap_between_slices_list:
+                for num_of_slices in [10,20]:
+                    _dir_surfix = f'{data_home_dir}'
+                    #os.makedirs(_dir_surfix, exist_ok=True)
+                    for vol_index in range(num_of_samples):
+                        dir_surfix_list.append(_dir_surfix)
+                        num_of_slices_list.append(num_of_slices)
+                        vol_index_list.append(vol_index)
+                        max_tickness_list.append(max_tickness)
+                        smallest_tickness_list.append(1)
+                        max_rotation_x_angle_list.append(80)
+                        ply_gen_mode_list.append(True)
+                        tasks_to_run.append(( _dir_surfix,no_gap_between_slices,num_of_slices, vol_index, max_tickness, 1, 80, True))
                     
                 #for _vol_index in range(vol_index):    
                 #for vol_index in [0]:
@@ -354,11 +377,12 @@ else:
 
         
     print(f'the number of jobs:{len(dir_surfix_list)}')
-    with multiprocessing.Pool(processes=64) as pool: # Use a pool of 4 processes
-        pool.starmap(process_task, zip(dir_surfix_list, num_of_slices_list, vol_index_list, max_tickness_list,smallest_tickness_list,max_rotation_x_angle_list,ply_gen_mode_list))
+    with multiprocessing.Pool( ) as pool: # Use a pool of 4 processes
+        #pool.starmap(process_task, zip(dir_surfix_list,no_gap_between_slices_list, num_of_slices_list, vol_index_list, max_tickness_list,smallest_tickness_list,max_rotation_x_angle_list,ply_gen_mode_list))
+        pool.starmap(process_task, tqdm(tasks_to_run, total=len(tasks_to_run), desc="process_task"))
 
 
-exit()
+#exit()
 
 settings.immediate_rendering = False
 cam = dict(
