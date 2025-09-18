@@ -7,12 +7,21 @@ import os
 from vtk.util import numpy_support
 import multiprocessing
 from utils import slice_util
+import trimesh
 def gen_random_rotated_vol(_vol_norm, max_rotation_x_angle = 20):
     #print('gen_random_rotated_vol')
     
     _vol_norm_rotated = _vol_norm.clone() #.rotate(_angle, axis=v, point=p).color('blue5', 0.5)
     LT = LinearTransform(); LT.rotate_x(90); LT.move(_vol_norm_rotated)
-    LT1 = LinearTransform(); _rotate_x = random.randint(0, max_rotation_x_angle); LT1.rotate_x(_rotate_x , rad=False ); LT1.move(_vol_norm_rotated)
+    LT1 = LinearTransform();
+    _rotate_x = random.randint(0, max_rotation_x_angle); 
+    _rotate_y = random.randint(0, max_rotation_x_angle); 
+    _rotate_z = random.randint(0, max_rotation_x_angle); 
+    LT1.rotate_x(_rotate_x , rad=False ); 
+    LT1.rotate_y(_rotate_y , rad=False ); 
+    LT1.rotate_z(_rotate_z , rad=False ); 
+    LT1.move(_vol_norm_rotated)
+    print('_rotate_x',_rotate_x,_rotate_y,_rotate_z)
     _points_vol_norm_rotated = numpy_support.vtk_to_numpy(_vol_norm_rotated.dataset.GetPoints().GetData())
     _translate = np.min(-_points_vol_norm_rotated, axis=0)
     #print(_translate)
@@ -71,12 +80,12 @@ def cut_with_bounds(_vol, top_box, bottom_box):
     _cut.dataset.GetPoints().SetData(numpy_support.numpy_to_vtk(_pts[_condition]))
     return _cut
 
-def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smallest_tickness = 1, max_rotation_x_angle = 20, ply_gen=False):
     global _vol_norm
+def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smallest_tickness = 1, max_rotation_x_angle = 20, ply_gen=False):
     global DEBUG
 
 
-    _dir = f'{_dir_surfix}/fractured_{vol_index}'    
+    _dir = f'{_dir_surfix}_{vol_index}/fractured_0'    
     os.makedirs(_dir, exist_ok=True)
     print(_dir)
 
@@ -114,7 +123,7 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smal
         
         #slice_index = 3
         _color = _cmaps[slice_index]
-        print(f'{_dir}/piece_{slice_index}.obj')
+        #print(f'{_dir}/piece_{slice_index}.obj')
 
         top_box, bottom_box = create_slicing_box(bounds, num_of_slices, slice_index, slice_tickness, max_slice_tickness, smallest_tickness)
         #_points_top_box = numpy_support.vtk_to_numpy(top_box.dataset.GetPoints().GetData())
@@ -174,15 +183,22 @@ def process_task(_dir_surfix, num_of_slices, vol_index, max_slice_tickness, smal
             #print('tickness',abs(np.max(_points, axis=0)[1]-np.min(_points, axis=0)[1]))   
             #mesh_obj_dict[vol_index]['flat'].append( Points(_points).color(_color, slice_color_alpha) )
         else:
-            _vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+            #_vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
             #Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
             
             #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #slice_list.append(_vol_norm_rotated_slice)
-            if ply_gen:
-                print(f'{_dir}/piece_{slice_index}.ply')
-                slice_util.pcd_2_mesh(f'{_dir}/piece_{slice_index}.obj',f'{_dir}/piece_{slice_index}.ply')
+            xyz_list = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
+            point_cloud = trimesh.PointCloud(vertices=np.array(xyz_list))
+
+            #print(f"Exporting to binary GLB format at '{glb_path}'...")
+            # 'export' handles the conversion to a self-contained binary file
+            point_cloud.export(file_obj=f'{_dir}/{slice_index}.glb')
+            
+            #if ply_gen:
+            #    print(f'{_dir}/piece_{slice_index}.ply')
+            #    slice_util.pcd_2_mesh(f'{_dir}/piece_{slice_index}.obj',f'{_dir}/piece_{slice_index}.ply')
 
     if DEBUG:
         return mesh_obj_dict
@@ -222,7 +238,7 @@ if True:
 
     #print('obj loaded')
     #_vol = meshes.normalize().wireframe().binarize()
-    _vol = meshes.wireframe().binarize()
+    _vol = meshes.wireframe().binarize(dims=[500,500,500])
     save(_vol, 'resources/reduced_vol.vti',binary=True)
     #print('converted into voxel')
 
@@ -230,7 +246,7 @@ if True:
 
 else:
     _vol = Volume('resources/reduced_vol.vti')
-data_home_dir = '/data/jhahn/data/shape_dataset/data/mouse_brain_50mm'
+data_home_dir = '/data/jhahn/data/shape_dataset/data/atlas_mouse_brain_50mm'
 num_of_slices = 20
 max_slice_tickness = 50
 max_rotation_x_angle = 20
@@ -317,10 +333,10 @@ else:
 
     #for surfix, vol_index in [('train',1000),('val',100)]:
     #for surfix, num_of_samples, ply_gen_mod in [('train',1000, False),('val',100, False),('test',100, True)]:
-    for surfix, num_of_samples, ply_gen_mod in [('test',10, True)]:
+    for num_of_samples in [100]:
         for max_tickness in [50]:
             for num_of_slices in [20]:
-                _dir_surfix = f'{data_home_dir}/{max_tickness}_tickness_{num_of_slices}_sllices_{surfix}'
+                _dir_surfix = f'{data_home_dir}/sliced_on_1_0_0_0.003_True_5_100_True_209_HIP'
                 os.makedirs(_dir_surfix, exist_ok=True)
                 for vol_index in range(num_of_samples):
                     dir_surfix_list.append(_dir_surfix)
@@ -328,8 +344,8 @@ else:
                     vol_index_list.append(vol_index)
                     max_tickness_list.append(max_tickness)
                     smallest_tickness_list.append(1)
-                    max_rotation_x_angle_list.append(20)
-                    ply_gen_mode_list.append(ply_gen_mod)
+                    max_rotation_x_angle_list.append(80)
+                    ply_gen_mode_list.append(True)
 
                     
                 #for _vol_index in range(vol_index):    
