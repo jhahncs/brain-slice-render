@@ -14,7 +14,7 @@ regions = (
     "TH",
     "HY",
 )
-scene.add_brain_region(*regions, silhouette=True)
+cortex = scene.add_brain_region(*regions, silhouette=True)
 
 
 def slc(scene, framen, totframes):
@@ -27,7 +27,18 @@ def slc(scene, framen, totframes):
 
     scene.slice(plane)
 
+# Get the bounding box of the cortex mesh
+cortex_bounds = cortex[1].mesh.bounds()
 
+# The bounds are a numpy array in the format [x_min, x_max, y_min, y_max, z_min, z_max]
+x_max = cortex_bounds[1]
+y_max = cortex_bounds[3]
+z_max = cortex_bounds[5]
+
+print(f"Maximum X coordinate: {x_max}")
+print(f"Maximum Y coordinate: {y_max}")
+print(f"Maximum Z coordinate: {z_max}")
+exit()
 anim = Animation(
     scene, Path.cwd(), "brainrender_animation_callback", size=None
 )
