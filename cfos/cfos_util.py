@@ -25,7 +25,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # log 출력 형식
-formatter = logging.Formatter('%(asctime)s[%(levelname)s]: %(message)s')
+formatter = logging.Formatter('%(asctime)s[%(levelname)s]:%(lineno)d: %(message)s')
 
 while logger.hasHandlers():
     logger.removeHandler(logger.handlers[0])
@@ -67,6 +67,7 @@ class Cfos_params():
     def __init__(self, request = None):
         if request == None:
             return 
+        
         self.group1_name = request.form.get('group1_name')
         self.group2_name = request.form.get('group2_name')
         self.pairwiseCompareMethod = request.form.get('pairwiseCompareMethod')
@@ -109,9 +110,9 @@ class Cfos():
         logger.info("cfos init begin")
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
-        self.prefix_to_remove_column = ['Mean_','SEM_','Unnamed',"average","VEH","EXP","mean","sem","%error",'Analyses']
+        self.prefix_to_remove_column = ['%E ','N=','Mean ','Mean_','SEM_','Unnamed',"average","VEH ","EXP","mean","Sem","sem","%error",'Analyses']
 
-        
+        self.cor_and_sag_sep_mode = False
         self.df_dict = {}
         
         if not load_from_files :
@@ -131,7 +132,7 @@ class Cfos():
             wb.close()
 
             for _name in self.df_dict:
-                logger.info(f"preprocessed:{_name}")
+                logger.info(f"preprocessing:{_name}")
                 self.df_dict[_name] = self._proprocess(self.df_dict[_name])
 
                 filename_df_temp =f'{output_dir}/df_sheet_{_name}.csv'
@@ -443,14 +444,25 @@ class Cfos():
     def _proprocess(self, _df):
         import sys
         try:
+            _df.columns = _df.columns.str.strip()
             for prefix in self.prefix_to_remove_column:
                 _df = _df.drop([a for a in _df.columns if a.startswith(prefix)], axis=1)
             #df_exp = df_exp.drop([a for a in df_exp.columns if a.endswith("fraction")], axis=1)
+            #print(_df.columns)
             _df.drop(_df[pd.isnull(_df['Region name'])].index, inplace=True)
             _df['Region ID'] = _df['Region ID'].astype(str)    
             if '.' in str(_df['Region ID'].values[0]):
                 _df['Region ID'] = _df['Region ID'].str[:-2]
+            '''
+            print(_df['TG number'].iloc[len(_df['TG number'])-1])
+            _df['TG number_converted'] = pd.to_numeric(_df['TG number'], errors='coerce')
+            rows_with_error = _df[_df['TG number_converted'].isnull()]
+            print("다음 행들에서 에러가 발생했습니다:")
+            print(rows_with_error)
+            '''
+
             _df['TG number'] = _df['TG number'].astype(int)
+
             for _c in _df.columns:
                 if _c.endswith('SS/cfos fraction'):
                     _df = _df.rename(columns={_c: _c.replace('SS/cfos fraction','SST/cfos fraction')})
@@ -459,31 +471,47 @@ class Cfos():
             _df = _df.fillna(0)
             for _c in _df.columns[3:]:
                 _df[_c] = _df[_c].astype(float)
+            self.cor_and_sag_sep_mode = True
+            for _c in _df.columns[3:]:
+                if _c.startswith("AVG "):
+                    self.cor_and_sag_sep_mode = False
+                    break
             
+            if self.cor_and_sag_sep_mode:    
+                # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
+                cfos_levels = [col.split('_')[-1] for col in _df.columns if len(col.split('_')) >= 2]
+                sample_ids = [col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]
 
-            # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
-            cfos_levels = [col.split('_')[-1] for col in _df.columns if len(col.split('_')) >= 2]
-            sample_ids = [col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]
+                # 삭제할 열 이름을 담을 리스트
+                cols_to_drop = []
+                cols_avg = []
+                # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
+                for s in sample_ids:
+                    for level in cfos_levels:
+                        cor_col = f'{s}_cor_{level}'
+                        sag_col = f'{s}_Sag_{level}'
+                        avg_col = f'AVG {s}_{level}'
+                        
+                        # 두 열의 평균을 계산하여 새로운 열에 할당
+                        _df[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
+                        cols_avg.append(avg_col)
+                        # 삭제할 열 이름 리스트에 추가
+                        cols_to_drop.extend([cor_col, sag_col])
 
-            # 삭제할 열 이름을 담을 리스트
-            cols_to_drop = []
+                logger.info(f"new AVG column: {','.join(cols_avg)}")
 
-            # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
-            for s in sample_ids:
-                for level in cfos_levels:
-                    cor_col = f'{s}_cor_{level}'
-                    sag_col = f'{s}_Sag_{level}'
-                    avg_col = f'{s}_{level}'
-                    
-                    # 두 열의 평균을 계산하여 새로운 열에 할당
-                    _df[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
-                    
-                    # 삭제할 열 이름 리스트에 추가
-                    cols_to_drop.extend([cor_col, sag_col])
+                # 기존 열들을 삭제
+                _df.drop(columns=cols_to_drop, inplace=True)
+            else:
+                cols_to_drop = []
+                for _c in _df.columns[3:]:
+                    if not _c.startswith("AVG "):
+                        cols_to_drop.append(_c)
+                _df.drop(columns=cols_to_drop, inplace=True)
 
-            # 기존 열들을 삭제
-            _df.drop(columns=cols_to_drop, inplace=True)
-            print(_df)
+
+            logger.info(f"columns: {','.join(_df.columns)}")
+
         except Exception as e:
             exc_type, exc_obj, tb = sys.exc_info()
             line_number = tb.tb_lineno

@@ -8,6 +8,7 @@ import random
 import logging
 import os
 from datetime import datetime
+import logging.handlers 
 # 로그 생성
 logger = logging.getLogger()
 
