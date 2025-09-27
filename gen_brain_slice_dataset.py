@@ -115,6 +115,7 @@ def cut_with_bounds(_vol, top_box, bottom_box):
     return _cut
 
     global _vol_norm
+
 def process_task(_dir_surfix, rotation_angle, no_gap_between_slices, num_of_slices, 
                  smallest_tickness = 1, ply_gen=False):
     global DEBUG
@@ -206,12 +207,29 @@ def process_task(_dir_surfix, rotation_angle, no_gap_between_slices, num_of_slic
         #print('slice',slice_index,len(_vol_norm_rotated_slice_pts))
         _vol_norm_rotated_slice = Points(_vol_norm_rotated_slice_pts).color(_color, slice_color_alpha)
         #_vol_norm_rotated_slice = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
+
+        #top_box_original = Box(pos=(xmin,ymax ,zmin), size=((xmax-xmin)*2, ( (num_of_slices-slice_index-1)*slice_tickness )*2 , (zmax-zmin)*2))
+        #bottom_box_original = Box(pos=(xmin,ymin,zmin), size=((xmax-xmin)*2, (slice_index*slice_tickness)*2 + smallest_tickness , (zmax-zmin)*2))
+
+        #_vol_norm_rotated_slice_mesh = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, 0.1)
+            
+        if slice_index == 0:
+            _vol_norm_rotated_slice_mesh = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).color(_color, slice_color_alpha)
+            #mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
+            #mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
+        elif  slice_index == num_of_slices - 1:
+            _vol_norm_rotated_slice_mesh = _vol_norm_rotated.clone().cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
+            #mesh_obj_dict[vol_index]['cut_plane'].append(bottom_box_top_plane.alpha(0.4))
+            #mesh_obj_dict[vol_index]['box'].append(bottom_box.color('g').alpha(0.4))
+
+        else:
+            _vol_norm_rotated_slice_mesh = _vol_norm_rotated.clone().cut_with_mesh(top_box, invert=True).cut_with_mesh(bottom_box, invert=True).color(_color, slice_color_alpha)
+            #mesh_obj_dict[vol_index]['cut_plane'].append(top_box_bottom_plane.alpha(0.4))
+            #mesh_obj_dict[vol_index]['box'].append(top_box.color('g').alpha(0.4))
+    
+
         if DEBUG:
 
-            top_box_original = Box(pos=(xmin,ymax ,zmin), size=((xmax-xmin)*2, ( (num_of_slices-slice_index-1)*slice_tickness )*2 , (zmax-zmin)*2))
-            bottom_box_original = Box(pos=(xmin,ymin,zmin), size=((xmax-xmin)*2, (slice_index*slice_tickness)*2 + smallest_tickness , (zmax-zmin)*2))
-
-            _vol_norm_rotated_slice_original = _vol_norm_rotated.clone().cut_with_mesh(top_box_original, invert=True).cut_with_mesh(bottom_box_original, invert=True).color(_color, 0.1)
             top_box_bottom_plane = Plane(pos=[ (xmax - xmin)/2 + xmin, 
                                     ymax-( (num_of_slices-slice_index-1)*slice_tickness) - smallest_tickness , 
                                     (zmax - zmin)/2 + zmin], normal=[0,1.0,0],
@@ -227,25 +245,27 @@ def process_task(_dir_surfix, rotation_angle, no_gap_between_slices, num_of_slic
         
         
         if DEBUG:
+            _vol_norm_rotated_slice_mesh.write(f'{_dir}/{slice_index}.obj')
             pass
             #print('tickness',abs(np.max(_points, axis=0)[1]-np.min(_points, axis=0)[1]))   
             #mesh_obj_dict[vol_index]['flat'].append( Points(_points).color(_color, slice_color_alpha) )
         else:
-            #_vol_norm_rotated_slice.write(f'{_dir}/piece_{slice_index}.obj')
+            _vol_norm_rotated_slice_mesh.write(f'{_dir}/{slice_index}.obj')
             #Points(_points).write(f'{_dir}/piece_flat_pcd_{slice_index}.obj')
             
             #print(slice_index, np.max(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #print(slice_index, np.min(numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData()), axis=0) )
             #slice_list.append(_vol_norm_rotated_slice)
-            xyz_list = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
-            xyz_list = np.array(xyz_list)
+            if False: #point cloud
+                xyz_list = numpy_support.vtk_to_numpy(_vol_norm_rotated_slice.dataset.GetPoints().GetData())
+                xyz_list = np.array(xyz_list)
 
-            point_cloud = trimesh.PointCloud(vertices=xyz_list)
-            #print(slice_index,np.min(xyz_list,axis=0),np.max(xyz_list,axis=0))
-            
-            #print(f"Exporting to binary GLB format at '{glb_path}'...")
-            # 'export' handles the conversion to a self-contained binary file
-            point_cloud.export(file_obj=f'{_dir}/{slice_index}.glb')
+                point_cloud = trimesh.PointCloud(vertices=xyz_list)
+                #print(slice_index,np.min(xyz_list,axis=0),np.max(xyz_list,axis=0))
+                
+                #print(f"Exporting to binary GLB format at '{glb_path}'...")
+                # 'export' handles the conversion to a self-contained binary file
+                point_cloud.export(file_obj=f'{_dir}/{slice_index}.glb')
             
             #if ply_gen:
             #    print(f'{_dir}/piece_{slice_index}.ply')
@@ -318,7 +338,7 @@ else:
 
 
 #exit()
-data_home_dir = '/data/jhahn/data/shape_dataset/data/atlas_mouse_brain_50mm'
+data_home_dir = '/data/jhahn/data/shape_dataset/data/atlas_mouse_brain_50mm_mesh'
 num_of_slices = 20
 max_slice_tickness = 50
 max_rotation_x_angle = 20
@@ -399,7 +419,9 @@ DEBUG = False
 
 
 if DEBUG:
-    mesh_obj_dict = process_task("output", no_gap_between_slices = True, num_of_slices = num_of_slices, vol_index = 0, max_slice_tickness = max_slice_tickness)
+    #mesh_obj_dict = process_task("output", no_gap_between_slices = True, num_of_slices = num_of_slices, vol_index = 0, max_slice_tickness = max_slice_tickness)
+    mesh_obj_dict = process_task("output", (1.0,0.0 ,0.0), no_gap_between_slices = True, num_of_slices = num_of_slices)
+
 else:
     random.seed(99)
     num_of_slices_list = []
@@ -410,7 +432,7 @@ else:
 
     max_rotation_x_angle = 30
     rotation_angles = []
-    for i in range(500):
+    for i in range(1000):
         
         _rotate_x = random.randint(0, max_rotation_x_angle); 
         _rotate_y = random.randint(0, max_rotation_x_angle); 
@@ -423,7 +445,7 @@ else:
     for no_gap_between_slices in no_gap_between_slices_list:
         for rotation_angle in rotation_angles:
             #for num_of_slices in list(range(3,11)):
-            for num_of_slices in [10]:
+            for num_of_slices in [5]:
 
 
                 tasks_to_run.append(( f'{data_home_dir}',rotation_angle, no_gap_between_slices,num_of_slices, 1, True))
