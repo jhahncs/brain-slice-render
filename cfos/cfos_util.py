@@ -90,7 +90,7 @@ class Cfos_params():
         return "{" + ", ".join(items) + "}"
     
     def stat_test_name(self):
-        return f'{self.group1_name}_{self.group2_name}_{self.pairwiseCompareMethod}_{self.multipleCompareCorrectionMethod}_a_{str(self.fdr_alpha)}_p_{str(self.pvalue_th)}_up_{str(self.fold_up)}_down_{str(self.fold_down)}'
+        return f'{self.group1_name}_{self.group2_name}_{self.pairwiseCompareMethod}_{self.multipleCompareCorrectionMethod}_a{str(self.fdr_alpha)}_p{str(self.pvalue_th)}_u{str(self.fold_up)}_d{str(self.fold_down)}'
     def heatpmap_vis_name(self):
         return f'{self.dist_label}_{self.num_of_imgs_in_brain_heatmap}'
     def stat_desc(self):
@@ -119,6 +119,7 @@ class Cfos():
             logger.info(f'loading: {filename}')
             #filename = 'resources/SST_PV_cfos_Summary_Jin_Mehdi_March25 (1).xlsx'
             wb = load_workbook(filename)
+            
             for sheet in wb.worksheets:
                 logger.info(f"Sheet: {sheet.title}")
                 if 'Description' in str(sheet.title):
@@ -131,13 +132,26 @@ class Cfos():
                 logger.info(f'{sheet.title} -> {df_name}')
             wb.close()
 
+            df_dict_updated = pd.read_excel(open('/home/jhahn/brain-slice-render/cfos/resources/B0600_0651cor_updated.xlsx', 'rb'), sheet_name='Sheet1')
+            df_dict_updated = self._proprocess(df_dict_updated) 
+            logger.info(f"df_dict_updated: {len(list(df_dict_updated.columns))} {list(df_dict_updated.columns)}")
+
             for _name in self.df_dict:
                 logger.info(f"preprocessing:{_name}")
-                self.df_dict[_name] = self._proprocess(self.df_dict[_name])
+                
 
+                self.df_dict[_name] = self._proprocess(self.df_dict[_name])                
+                self.df_dict[_name] = self.df_dict[_name].loc[:1014] 
+
+                self.df_dict[_name] = self._value_update(self.df_dict[_name], df_dict_updated)
+
+                self.df_dict[_name] = self._agg_cor_sag(self.df_dict[_name])
+                
                 filename_df_temp =f'{output_dir}/df_sheet_{_name}.csv'
                 logger.info(f"{_name} sheet was saved into: {filename_df_temp}")
                 self.df_dict[_name].to_csv(filename_df_temp, index=None)
+
+
 
 
 
@@ -177,8 +191,8 @@ class Cfos():
         for _i, _name in enumerate(self.group_names):
             #print(file,_name,list(self.df_dict[_name].index))
             if _i == 0:
-                self.color_list_full = list(set([c.split("_")[1] for c in self.df_dict[_name].columns if len(c.split("_")) == 2]))
-                logger.info(f"{self.color_list_full}")
+                self.color_name_list_full = self._get_color_name_list_from_df(self.df_dict[_name])
+                logger.info(f"{self.color_name_list_full}")
                 id_mapping_filename = f'{output_dir}/id_name.csv'
                 logger.info(f"id mappings saved into: {id_mapping_filename}")
                 self.build_id_mappings(self.df_dict[_name], id_mapping_filename)
@@ -205,7 +219,7 @@ class Cfos():
         response = {}
         col_list = []
         for _name in self.df_dict:
-            c = list(set([c.split("_")[1] for c in self.df_dict[_name].columns if len(c.split("_")) == 2]))
+            c = list(set(["_".join(c.split('_')[2:]) for c in self.df_dict[_name].columns if len(c.split("_")) >= 2]))
             col_list.append(c)
         if not self.check_lists_same_elements_sets(*col_list):
             r = self.get_error_ement(col_list)
@@ -246,7 +260,7 @@ class Cfos():
         return list(common_elements)
     def preprocess_summary(self):
         summary = OrderedDict()
-        summary['color'] = ", ".join(self.color_list_full)
+        summary['color'] = ", ".join(self.color_name_list_full)
 
         for _group_name in self.group_names:
             summary[_group_name] = ", ".join(self._get_sample_ids(_group_name))
@@ -267,8 +281,16 @@ class Cfos():
             rows.append(row)
         return pd.DataFrame(rows)
     def build_group1_and_group2(self, df_group1_name, df_group2_name, load_from_files = False):
-        df_group1 = self.df_dict[df_group1_name]
-        df_group2 = self.df_dict[df_group2_name]
+        df_group1 = self.df_dict[df_group1_name].copy()
+
+        df_group1 = df_group1[~df_group1['TG number'].astype(int).between(1016, 1328)]
+
+        self.color_name_list_full = self._get_color_name_list_from_df(df_group1)
+        logger.info(f'color_name_list_full: {self.color_name_list_full}')
+        #color_list = sorted(list(set(df_mean_cor_sag['color']))) 
+        df_group2 = self.df_dict[df_group2_name].copy()
+        df_group2 = df_group2[~df_group2['TG number'].astype(int).between(1016, 1328)]
+
         filename_df_exp_veh = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}.csv'
 
         filename_df_raw = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}_by_color.csv'
@@ -294,7 +316,7 @@ class Cfos():
             df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
             subject_id_group1 = self._get_sample_ids(df_group1_name)
             df_total['group_name'] = [df_group1_name if a.split('_')[0] in subject_id_group1 else df_group2_name for a in df_total.index]
-            df_total['color'] =[ a.split('_')[1] for a in df_total.index]
+            df_total['color'] =[ "_".join(a.split('_')[1:]) for a in df_total.index]
             df_total.to_csv(filename_df_raw)
             logger.info(f'two group by color data saved into : {filename_df_raw}')
 
@@ -330,16 +352,28 @@ class Cfos():
         
 
 
-    def _get_columns_color(self, _df, _colors):
-
-        _columns_color = sorted(list(set([c for c in _df.columns if len(c.split("_")) == 2 and c.split("_")[1] in _colors])))            
+    def _get_columns_with_color(self, _df):
+        _columns_color = sorted(list(set([c for c in _df.columns if c.lower() not in ['tg number','region id','region name']])))            
         return _columns_color
     
+    def _get_color_name_list_from_df(self,_df):
+        _list = self._get_columns_with_color(_df)
+        return list(set(self._get_color_name_from_column_name(c) for c in _list))
+    
+
+    def _get_color_name_from_column_name(self,colname):
+        if 'TG number' in colname or 'Region ID' in colname or 'Region name' in colname:
+            return None
+        if '_cor_' in colname or '_sag_' in colname:
+            return "_".join(colname.split('_')[2:])
+        else:
+            return "_".join(colname.split('_')[1:])
+
+
 
     def _get_sample_ids(self, group_name):
-        df_group1 = self.df_dict[group_name]
-        
-        sample_ids = sorted(list(set([a.split("_")[0] for a in self._get_columns_color(df_group1, self.color_list_full)])))
+        df_group1 = self.df_dict[group_name]        
+        sample_ids = sorted(list(set([a.split("_")[0] for a in self._get_columns_with_color(df_group1)])))
         return sample_ids
     
     def _get_metadata(self,df_g1_g2, df_group1_name, df_group2_name):
@@ -348,28 +382,24 @@ class Cfos():
         df_group2 = self.df_dict[df_group2_name]
         
         
-        _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
+        _df_temp = df_g1_g2[self._get_columns_with_color(df_g1_g2)]
         
         _tg_n = list(_df_temp[(_df_temp.sum(axis=1) == 0)].index)
         region_ids_with_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
-        logger.info(f'The number of regions with all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(region_ids_with_all_zero_exp_veh)}')
+        logger.info(f'The number of regions with all zero in {df_group1_name} and {df_group2_name} in {self.color_name_list_full}: {len(region_ids_with_all_zero_exp_veh)}')
 
 
-        _df_temp = df_g1_g2[self._get_columns_color(df_g1_g2,self.color_list_full)]
+        _df_temp = df_g1_g2[self._get_columns_with_color(df_g1_g2)]
         _tg_n = list(_df_temp[~(_df_temp.sum(axis=1) == 0)].index)
         region_ids_with_NOT_all_zero_exp_veh = []
         for tg_number in _tg_n: # Taking key and values from dictionary.
             region_ids_with_NOT_all_zero_exp_veh.append(self.tg_num_2_region_id[tg_number])
-        logger.info(f'The number of regions with NOT all zero in {df_group1_name} and {df_group2_name} in {self.color_list_full}: {len(region_ids_with_NOT_all_zero_exp_veh)}')
+        logger.info(f'The number of regions with NOT all zero in {df_group1_name} and {df_group2_name} in {self.color_name_list_full}: {len(region_ids_with_NOT_all_zero_exp_veh)}')
 
 
         return region_ids_with_all_zero_exp_veh
-        #for _c in color_list_full:
-        #    _df_exp_veh_color_all = _df_exp_veh[[c for c in _df_exp_veh.columns  if len(c.split("_")) == 3 and c.split("_")[2] == _c]]
-        #    s = (_df_exp_veh_color_all != 0).all(axis=1)
-        #    print(_c, s.sum())
 
 
     def mean_value_by_color(self, region_ids, filename = 'mean_value_by_color.csv'):
@@ -440,7 +470,98 @@ class Cfos():
         logger.info(f'loaded agg data: {filename}')
 
 
+    def _value_update(self, _df, df_dict_updated):
 
+        
+
+        source_df = df_dict_updated
+        target_df = _df
+
+        # update 실행 (In-place 연산이므로 반환값 없이 바로 적용됨)
+        #target_df.update(source_df)
+
+
+
+        # 1. 두 데이터프레임에 공통으로 존재하는 컬럼 찾기
+        common_cols = source_df.columns.intersection(target_df.columns)
+        logger.info(f'common_cols: {len(list(common_cols))} {list(common_cols)}')
+        # 2. 공통 컬럼에 대해서만 값 덮어쓰기
+        for col in common_cols:
+            if col in ['TG number','Region ID','Region name']:
+                continue
+            # 인덱스를 기준으로 매핑하여 덮어씁니다.
+            
+            
+
+            #diff = target_df[[col]].compare(source_df[[col]])
+            #if len(diff) > 0:
+            #logger.info(f"{col}:{diff}")
+            target_df[col] = source_df[col]
+            #diff = target_df[[col]].compare(source_df[[col]])
+            #if len(diff) > 0:
+            #logger.info(f"{col}:{diff}")
+        #filename_df_temp =f'{output_dir}/df_sheet_{_name}_updated.csv'
+        #logger.info(f"{_name} sheet was saved into: {filename_df_temp}")
+        #self.df_dict[_name].to_csv(filename_df_temp, index=None)
+        return _df
+    def _agg_cor_sag(self, _df):
+        self.cor_and_sag_sep_mode = True
+        for _c in _df.columns[3:]:
+            if _c.startswith("AVG "):
+                self.cor_and_sag_sep_mode = False
+                break
+        
+
+
+
+
+
+        if self.cor_and_sag_sep_mode:    
+            # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
+            cfos_levels = list(set(["_".join(col.split('_')[2:]) for col in _df.columns if len(col.split('_')) >= 2]))
+            sample_ids = list(set([col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]))
+            logger.info(f"cfos_levels: {', '.join(cfos_levels)}")
+            logger.info(f"sample_ids: {', '.join(sample_ids)}")
+            # 삭제할 열 이름을 담을 리스트
+            cols_to_drop = []
+            cols_avg = []
+            new_data = {}  # or a list of DataFrames
+            # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
+            for s in sample_ids:
+                for level in cfos_levels:
+                    cor_col = f'{s}_cor_{level}'
+                    sag_col = f'{s}_Sag_{level}'
+                    avg_col = f'{s}_{level}'
+                    
+                    # 두 열의 평균을 계산하여 새로운 열에 할당
+                    #_df[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
+
+                    #if cor_col == ''
+                    new_data[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
+                    cols_avg.append(avg_col)
+                    # 삭제할 열 이름 리스트에 추가
+                    cols_to_drop.extend([cor_col, sag_col])
+
+            
+            new_cols_df = pd.DataFrame(new_data)
+            _df = pd.concat([_df,new_cols_df], axis=1)
+
+            # 기존 열들을 삭제
+            logger.info(f"columns(droped): {','.join(cols_to_drop)}")
+            _df.drop(columns=cols_to_drop, inplace=True)
+            #logger.info(f"columns(remain): {','.join(_df.columns)}")
+            
+        else:
+            cols_to_drop = []
+            for _c in _df.columns[3:]:
+                if not _c.startswith("AVG "):
+                    cols_to_drop.append(_c)
+            _df.drop(columns=cols_to_drop, inplace=True)
+
+
+        logger.info(f"columns(remain): {','.join(_df.columns)}")
+        return _df
+    
     def _proprocess(self, _df):
         import sys
         try:
@@ -471,47 +592,9 @@ class Cfos():
             _df = _df.fillna(0)
             for _c in _df.columns[3:]:
                 _df[_c] = _df[_c].astype(float)
-            self.cor_and_sag_sep_mode = True
-            for _c in _df.columns[3:]:
-                if _c.startswith("AVG "):
-                    self.cor_and_sag_sep_mode = False
-                    break
             
-            if self.cor_and_sag_sep_mode:    
-                # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
-                cfos_levels = [col.split('_')[-1] for col in _df.columns if len(col.split('_')) >= 2]
-                sample_ids = [col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]
-
-                # 삭제할 열 이름을 담을 리스트
-                cols_to_drop = []
-                cols_avg = []
-                # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
-                for s in sample_ids:
-                    for level in cfos_levels:
-                        cor_col = f'{s}_cor_{level}'
-                        sag_col = f'{s}_Sag_{level}'
-                        avg_col = f'AVG {s}_{level}'
-                        
-                        # 두 열의 평균을 계산하여 새로운 열에 할당
-                        _df[avg_col] = (_df[cor_col] + _df[sag_col]) / 2
-                        cols_avg.append(avg_col)
-                        # 삭제할 열 이름 리스트에 추가
-                        cols_to_drop.extend([cor_col, sag_col])
-
-                logger.info(f"new AVG column: {','.join(cols_avg)}")
-
-                # 기존 열들을 삭제
-                _df.drop(columns=cols_to_drop, inplace=True)
-            else:
-                cols_to_drop = []
-                for _c in _df.columns[3:]:
-                    if not _c.startswith("AVG "):
-                        cols_to_drop.append(_c)
-                _df.drop(columns=cols_to_drop, inplace=True)
-
-
-            logger.info(f"columns: {','.join(_df.columns)}")
-
+            
+            #logger.info(f"rows(last five): {list(_df.loc[-5:]['TG number'])}")
         except Exception as e:
             exc_type, exc_obj, tb = sys.exc_info()
             line_number = tb.tb_lineno
@@ -534,6 +617,7 @@ class Cfos():
         if not os.path.exists(id_mapping_filename):
             _df[['TG number','Region ID','Region name']].to_csv(id_mapping_filename, index = None)
             logger.info(f'id mappings are saved into {id_mapping_filename}')
+
 
     def gen_zero_value_heatmap_color(self, output_filename):
         _color = "SST"
@@ -567,21 +651,17 @@ class Cfos():
             ax_i += 1
             valid_list = []
             #print(self.color_list_full)
-            for _color in self.color_list_full:
+            for _color in self.color_name_list_full:
                 #for _cut in ['cor','sag']:
 
-                _df_exp_veh_color_cor = _this_df[[c for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]]
-                #print([c for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color])
-                #print(_df_exp_veh_color_cor)
-                columns_new = [c.split("_")[0] + "_" + c.split("_")[1] for c in _this_df.columns if len(c.split("_")) >= 2 and c.split("_")[1] == _color]
+                _df_exp_veh_color_cor = _this_df[[c for c in _this_df.columns if self._get_color_name_from_column_name(c) == _color]]
+                columns_new = [c.split("_")[0] + "_" + self._get_color_name_from_column_name(c) for c in _this_df.columns if self._get_color_name_from_column_name(c) == _color]
                 #print(columns_new)
                 _df_exp_veh_color_cor.columns = columns_new
                 _df_exp_veh_color = _df_exp_veh_color_cor
                 s = (_df_exp_veh_color == 0).sum(axis=1)
 
 
-                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color]]
-                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.endswith("_"+_color) and "_"+cut+"_" in c ]]
 
                 #s = (_df_exp_veh_color == 0).sum(axis=1)
                 valid_list.append(s)
@@ -593,7 +673,7 @@ class Cfos():
 
             #df_non_zero_regions.index = valid_list[0].index
             #print(df_non_zero_regions)
-            df_non_zero_regions.columns = self.color_list_full
+            df_non_zero_regions.columns = self.color_name_list_full
             #print(df_non_zero_regions)
 
         #cbar_kws = dict(use_gridspec=False,location="top")
@@ -636,8 +716,8 @@ class Cfos():
                 ax.set_xticklabels("")
 
             #_h.set_xticklabels(_h.get_xticklabels(), fontsize = 7)
-            ax.set_yticks([a+0.5 for a in list(range(len(self.color_list_full))) ])
-            ax.set_yticklabels(self.color_list_full, fontsize=5)
+            ax.set_yticks([a+0.5 for a in list(range(len(self.color_name_list_full))) ])
+            ax.set_yticklabels(self.color_name_list_full, fontsize=5)
             ax.tick_params(axis='y', length=0, pad=5)
             #ax.legend()
         #fig.legend(labels=['Low', 'Medium', 'High'], loc="lower center", ncol=4)
@@ -676,19 +756,17 @@ class Cfos():
             ax = axes[ax_i]
             ax_i += 1
             valid_list = []
-            for _color in self.color_list_full:
+            for _color in self.color_name_list_full:
 
-                _df_exp_veh_color_cor = self.df_exp_veh[[c for c in self.df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color and c.split("_")[1] == 'cor']]
-                _df_exp_veh_color_sag = self.df_exp_veh[[c for c in self.df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color and c.split("_")[1] == 'sag']]
-                columns_new = [c.split("_")[0] + "_" + c.split("_")[2] for c in self.df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color and c.split("_")[1] == 'cor']
+                _df_exp_veh_color_cor = self.df_exp_veh[[c for c in self.df_exp_veh.columns if c.split("_")[0] in ids and "_".join(c.split('_')[2:]) == _color and c.split("_")[1] == 'cor']]
+                _df_exp_veh_color_sag = self.df_exp_veh[[c for c in self.df_exp_veh.columns if c.split("_")[0] in ids and "_".join(c.split('_')[2:]) == _color and c.split("_")[1] == 'sag']]
+                columns_new = [c.split("_")[0] + "_" + "_".join(c.split('_')[2:]) for c in self.df_exp_veh.columns if c.split("_")[0] in ids and "_".join(c.split('_')[2:]) == _color and c.split("_")[1] == 'cor']
                 _df_exp_veh_color_cor.columns = columns_new
                 _df_exp_veh_color_sag.columns = columns_new
                 _df_exp_veh_color = _df_exp_veh_color_cor + _df_exp_veh_color_sag
                 s = (_df_exp_veh_color == 0).sum(axis=1)
 
 
-                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.split("_")[0] in ids and c.split("_")[2] == _color]]
-                #_df_exp_veh_color = _df_exp_veh[[c for c in _df_exp_veh.columns if c.endswith("_"+_color) and "_"+cut+"_" in c ]]
 
                 #s = (_df_exp_veh_color == 0).sum(axis=1)
                 valid_list.append(s)
@@ -696,7 +774,7 @@ class Cfos():
 
             df_non_zero_regions = pd.concat(valid_list, axis=1).reindex(valid_list[0].index)
             #df_non_zero_regions.index = valid_list[0].index
-            df_non_zero_regions.columns = self.color_list_full
+            df_non_zero_regions.columns = self.color_name_list_full
             #print(df_non_zero_regions)
 
         #cbar_kws = dict(use_gridspec=False,location="top")
@@ -737,8 +815,8 @@ class Cfos():
                 ax.set_xticklabels("")
 
             #_h.set_xticklabels(_h.get_xticklabels(), fontsize = 7)
-            ax.set_yticks([a+0.5 for a in list(range(len(self.color_list_full))) ])
-            ax.set_yticklabels(self.color_list_full, fontsize=5)
+            ax.set_yticks([a+0.5 for a in list(range(len(self.color_name_list_full))) ])
+            ax.set_yticklabels(self.color_name_list_full, fontsize=5)
             ax.tick_params(axis='y', length=0, pad=5)
             #ax.legend()
         #fig.legend(labels=['Low', 'Medium', 'High'], loc="lower center", ncol=4)

@@ -124,7 +124,7 @@ for c in df_fold.columns:
     color_2_dict_down[c] = data_dict_down
 
     color_2_up_down = {}
-    color_2_up_down['cut_method'] = c.split("_")[0]
+    color_2_up_down['cut_method'] = 
     color_2_up_down['color'] = c.split("_")[1]
     color_2_up_down['Fold > 2'] = len(data_dict_up)
     color_2_up_down['Fold < 0.5'] = len(data_dict_down)

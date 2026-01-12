@@ -75,7 +75,7 @@ cfos = None
 def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, fold_up=1.5, fold_down=0.5):
     global bg_atlas
     #global df_fold
-    logger.info(f'{_column}')
+    #logger.info(f'{_column}')
     data_dict = {}
     data_dict['up'] = {}
     data_dict['down'] = {}
@@ -123,6 +123,11 @@ def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, 
     #not_found_region_id_with_no_zero_value = [str(a).lower() for a in not_found_region_id_with_no_zero_value]
 
     #return data_dict_up, data_dict_down, not_found_region_id_with_no_zero_value
+def _sig_name_csv_merge(_ref_df, df_sig_region_fold, _color_name):
+    _df_right = df_sig_region_fold[df_sig_region_fold['color'] == _color_name][['TG number','Region ID','Region Name','fold']].copy()
+    _df_right.rename(columns = {'fold': _color_name}, inplace=True) 
+    _merged = pd.merge(_ref_df, _df_right, left_on =['TG number','Region ID','Region Name'], right_on=['TG number','Region ID','Region Name'], how='outer')
+    return _merged
 
 df_fold = None
 def build_dict(cfos, _df_fold, ptest, params: cfos_util.Cfos_params):
@@ -213,8 +218,24 @@ def build_dict(cfos, _df_fold, ptest, params: cfos_util.Cfos_params):
                     print("NOT FOUND:"+region_id)
                     continue   
                 _rows.append(_row)           
-    df_sig_region_fold = pd.DataFrame(_rows)
-    return color_2_dict_up, color_2_dict_down, df_sig_region_fold
+    
+
+
+    if len(_rows) > 0:
+        df_sig_region_fold = pd.DataFrame(_rows)
+        df_sig_region_fold['TG number'] = pd.to_numeric(df_sig_region_fold['TG number'])
+
+        df_sig_region_fold_merged = cfos.df_dict[list(cfos.df_dict.keys())[0]][['TG number','Region ID','Region name']].copy() 
+        df_sig_region_fold_merged['TG number'] = df_sig_region_fold_merged['TG number'].astype(int)
+        df_sig_region_fold_merged.rename(columns = {'Region name': 'Region Name'}, inplace=True) 
+        for color_name in cfos.color_name_list_full:
+            df_sig_region_fold_merged = _sig_name_csv_merge(df_sig_region_fold_merged, df_sig_region_fold, color_name)
+
+
+        return color_2_dict_up, color_2_dict_down, df_sig_region_fold, df_sig_region_fold_merged
+    else:
+        return color_2_dict_up, color_2_dict_down, None, None
+    
 '''
 df_num_regions = pd.DataFrame(num_of_regions_with_fold)
 
@@ -313,10 +334,58 @@ def full_extent(ax, pad=0.0):
     bbox = Bbox.union([item.get_window_extent() for item in items])
 
     return bbox.expanded(1.0 + pad, 1.0 + pad)
+import seaborn as sns
 
+def _draw_heatmap_for_all_signals(filename_sig_regions,_df_merged, color_name_list_full,group1_name, group2_name, stat_name, fold_up, fold_down):
+
+    def _draw_heatmap_temp(_ax, heatmap_data, color, min_val, max_val):
+
+        cbar_ticks = [min_val, max_val]
+        sns.heatmap(heatmap_data, ax=_ax, annot=False, fmt='.1f',# [핵심] 최대값을 색상 범위 끝으로 설정
+                        vmax=max_val, vmin=min_val,linewidths=0,    # [핵심] 격자 선의 두께 (보통 0.5 ~ 1 정도가 적당)
+                        #linecolor='gray',
+                        cbar_kws={
+                            'ticks': cbar_ticks,  # 눈금 위치 지정
+                            'format': '%.2f',
+                        }, cmap=color, xticklabels=100)
+        for side in ['top', 'bottom', 'left', 'right']:
+            _ax.spines[side].set_visible(True)   # 테두리가 보이게 설정
+            _ax.spines[side].set_linewidth(1)    # 테두리 두께 (2로 설정하면 진하게 보임)
+            _ax.spines[side].set_color('gray')  # 테두리 색상
+
+        # 3. Y축 방향(가로줄) 경계선 직접 그리기
+        # 데이터의 행 개수(rows)와 열 개수(cols)를 구합니다.
+        rows, cols = heatmap_data.shape
+
+
+        _ax.hlines(y=range(1, rows), xmin=0, xmax=cols, colors='gray', linewidths=0.5)
+        cbar = _ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=10)  # 폰트 크기 (원하는 크기로 숫자를 변경하세요)
+        cbar.set_label(f'Fold change:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=6)
+        cbar.ax.tick_params(size=0)
+        _ax.tick_params(axis='y', labelrotation=0)
+        _ax.set_yticklabels(axes[0].get_yticklabels(), rotation=0, va='center')
+    #plt.figure(figsize=(15, 3))  # 그래프 크기 조절
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, int(len(color_name_list_full))))
+    #plt.yticks(rotation=90) # Y축 글자 수평 정렬
+    heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
+    heatmap_data[heatmap_data < fold_up] = 0
+    _draw_heatmap_temp(axes[0], heatmap_data.T, 'Greens', fold_up, heatmap_data.max().max())
+
+    heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
+    heatmap_data[heatmap_data > fold_down] = 0
+    _draw_heatmap_temp(axes[1], heatmap_data.T, 'Reds', 0.0, fold_down)
+
+    fig.suptitle(f'{stat_name}', fontsize=10)
+    plt.xlabel('TG Number')  # X축 이름
+    #plt.ylabel('Signals')  # Y축 이름
+    
+    plt.tight_layout(rect=[0, 0, 1, 1])
+    #plt.show()
+    fig.savefig(filename_sig_regions, dpi=600, bbox_inches='tight', pad_inches=1)
 
 def _gen_brain_heatmap(output_dir,params, ptest, color_code,
-                       color_2_dict_up,color_2_dict_down):
+                       color_2_dict_up,color_2_dict_down, gen_individual_image = False):
     
     
     
@@ -375,6 +444,10 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
         #ax = fig.add_subplot(spec[ax_row_index:ax_row_index+3,ax_col_index])
         #ax.set_axis_off()
         #ax.text(0.5, 0.5,f'{subtitle}',  fontsize = 20)
+        if len(data_dict) == 0:
+            logger.info(f'No region found: {subtitle},{color_code}')
+            continue
+        
         
 
         _max = np.max(list(data_dict.values()))
@@ -428,14 +501,15 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
                 _ind_fig, _ind_p = scene.plot_subplot(fig=fig, ax=ax, show_cbar=False, hide_axes=True)
                 #ax.figure.savefig(f'{output_dir}/heatmap_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff')
 
-                # Save just the portion _inside_ the second axis's boundaries
-                extent = full_extent(ax).transformed(fig.dpi_scale_trans.inverted())
-                # Alternatively,
-                os.makedirs(f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}', exist_ok=True)
-                # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
-                ind_file = f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
-                fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
-                tiff_files.append(ind_file)
+                if gen_individual_image:
+                    # Save just the portion _inside_ the second axis's boundaries
+                    extent = full_extent(ax).transformed(fig.dpi_scale_trans.inverted())
+                    # Alternatively,
+                    os.makedirs(f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}', exist_ok=True)
+                    # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
+                    ind_file = f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+                    fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
+                    tiff_files.append(ind_file)
 
                 if params.dist_label == 'true':
                     ax.set_title(f'{distance} \u03BCm', fontsize=5)
@@ -490,6 +564,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
     plt.tight_layout()
     #plt.show()
 
+    logger.info(f"not_visualized_region:{not_visualized_regions}")
 
     _filename = f'{output_dir}/one_heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.png'
     fig.savefig(_filename, dpi=600, bbox_inches='tight', pad_inches=1)

@@ -44,8 +44,8 @@ logger.addHandler(fileHandler)
 color_list = ['PV','cfos','SST']
 
 
-def _get_columns_color(self, _df, _color_list):
-    return [c for c in _df.columns if len(c.split("_")) == 3 and c.split("_")[2] in _color_list]
+#def _get_columns_color(self, _df, _color_list):
+#    return [c for c in _df.columns if len(c.split("_")) == 3 and c.split("_")[2] in _color_list]
 
 def mystatistic(x, y):
   return np.mean(x, axis=0) - np.mean(y, axis=0)
@@ -251,8 +251,11 @@ def cal_fold(cfos, df_mean_cor_sag, g1_name, g2_name, result_filename="output/fo
         logger.info(f"cal fold : {g1_name}/{g2_name}")
         _df_list = []
         _df_columns = []
+        color_list = sorted(list(set(df_mean_cor_sag['color'])))            
+
         #color_list = cfos._get_columns_color(df_mean_cor_sag, cfos.color_list_full)
-        for _color in cfos.color_list_full:
+        
+        for _color in color_list:#cfos.color_list_full:
             #for _cut_method in ['cor','sag']:
 
             _df_total_g1 = df_mean_cor_sag.query(f'color=="{_color}" and group_name == "{g1_name}" ').drop(['group_name','color','sample_id'],axis=1).copy()
@@ -301,7 +304,7 @@ def cal_fold(cfos, df_mean_cor_sag, g1_name, g2_name, result_filename="output/fo
         _df_fold = _df_fold.replace(np.inf, 0)
         _df_fold['TG number'] = _df_fold.index.map(cfos.region_id_2_tg_id)
         _df_fold['Region Name'] = _df_fold.index.map(cfos.region_id_2_name)
-        _df_fold = _df_fold[['TG number','Region Name'] + cfos.color_list_full]
+        _df_fold = _df_fold[['TG number','Region Name'] + color_list]
         #_df_fold.set_index('TG number', inplace=True)
         
         logger.info("cal fold saved into:"+result_filename)
