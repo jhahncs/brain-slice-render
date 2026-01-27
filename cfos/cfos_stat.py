@@ -9,6 +9,16 @@ import logging
 import os
 from datetime import datetime
 import logging.handlers 
+import pandas as pd
+import numpy as np
+# [수정] namedtuple 임포트 추가
+from collections import namedtuple
+# [수정] numpy2ri 추가 임포트
+from rpy2.robjects import pandas2ri, numpy2ri, r, StrVector, globalenv
+from rpy2.robjects.packages import importr
+from rpy2.robjects.conversion import localconverter
+import os
+import rpy2
 # 로그 생성
 logger = logging.getLogger()
 
@@ -50,6 +60,162 @@ color_list = ['PV','cfos','SST']
 def mystatistic(x, y):
   return np.mean(x, axis=0) - np.mean(y, axis=0)
 
+
+# [추가] stats.ttest_ind와 호환되는 반환 타입 정의
+TtestResult = namedtuple('TtestResult', ['statistic', 'pvalue'])
+def run_limma_via_rpy2(a, b, axis=1, nan_policy='propagate', r_lib_path=None):
+    """
+    scipy.stats.ttest_ind와 유사한 입력/출력 인터페이스로 Limma(Moderated T-test)를 실행하는 함수.
+    
+    Parameters:
+    - a, b: array_like or pd.DataFrame
+        두 그룹의 관측 데이터. 
+        axis=1(기본값)일 때, (n_features, n_samples) 형태를 가정합니다 (유전자=행, 샘플=열).
+        axis=0일 때, (n_samples, n_features) 형태를 가정합니다.
+    - axis: int, optional (default=1)
+        샘플이 나열된 축. Genomics 데이터는 보통 열(axis=1)이 샘플입니다.
+    - nan_policy: {'propagate', 'omit'}, optional
+        'propagate': NaN을 그대로 R로 전달합니다 (Limma가 처리, 일부 유전자는 결과가 NA일 수 있음).
+        'omit': NaN이 하나라도 포함된 유전자(행)를 분석에서 제외합니다.
+    - r_lib_path: str, optional
+        R 패키지가 설치된 경로.
+    
+    Returns:
+    - TtestResult(statistic, pvalue): 
+        t-통계량과 p-value를 담은 객체. 입력 유전자 순서대로 반환됩니다(omit 사용 시 제외된 유전자는 빠짐).
+    """
+    try:
+        # base 패키지는 시스템 기본 경로에서 로드
+        base = importr('base')
+        
+        # [수정됨] R 라이브러리 경로가 지정된 경우, R 환경 전체 경로에 추가
+        if r_lib_path:
+            # 윈도우 경로 역슬래시 이슈 방지
+            r_lib_path = r_lib_path.replace("\\", "/")
+            if os.path.exists(r_lib_path):
+                print(f"R 라이브러리 검색 경로에 추가: {r_lib_path}")
+                r(f".libPaths(c('{r_lib_path}', .libPaths()))")
+            else:
+                print(f"[주의] 지정한 R 라이브러리 경로를 찾을 수 없습니다: {r_lib_path}")
+
+        # limma 패키지 로드
+        if r_lib_path and os.path.exists(r_lib_path):
+            limma = importr('limma', lib_loc=r_lib_path)
+        else:
+            limma = importr('limma')
+            
+    except Exception as e:
+        # [수정] 에러 발생 시 None 반환 대신 예외를 다시 발생시켜 원인을 파악할 수 있게 함
+        print(f"R 패키지 로드 실패. 에러 메시지: {e}")
+        raise e
+
+    # [수정] 데이터 전처리 및 병합
+    
+    # 1. DataFrame 변환
+    if not isinstance(a, pd.DataFrame):
+        a = pd.DataFrame(a)
+    if not isinstance(b, pd.DataFrame):
+        b = pd.DataFrame(b)
+        
+    # 2. Axis 조정 (axis=0이면 전치하여 features가 행이 되도록 만듦)
+    if axis == 0:
+        a = a.T
+        b = b.T
+        
+    # 3. 데이터 병합 (가로 방향)
+    # [수정] join='inner' 사용: 두 데이터셋의 인덱스(유전자)가 다를 경우 공통 유전자만 분석
+    # (기본값인 outer를 쓰면 인덱스 불일치 시 NaN이 대량 발생하여 에러 원인이 됨)
+    data = pd.concat([a, b], axis=1, join='inner')
+    
+    if data.shape[0] < a.shape[0] or data.shape[0] < b.shape[0]:
+        print(f"[알림] 인덱스(유전자) 매칭을 위해 일부 행이 제외되었습니다. (분석 대상: {data.shape[0]}개)")
+
+    # [추가] nan_policy 처리
+    if data.isnull().values.any():
+        if nan_policy == 'omit':
+            original_len = len(data)
+            data = data.dropna()
+            print(f"[알림] NaN이 포함된 {original_len - len(data)}개의 유전자를 제외했습니다.")
+        else:
+            print("[주의] 데이터에 NaN(결측치)이 포함되어 있습니다. Limma는 이를 처리할 수 있지만 결과에 영향을 줄 수 있습니다.")
+
+    # [추가] 데이터 타입 강제 변환 (float)
+    try:
+        data = data.astype(float)
+    except ValueError as e:
+        # [수정] 변환 실패 시 명시적 예외 발생
+        print("[치명적 오류] 데이터를 숫자로 변환할 수 없습니다. 문자열 등이 포함되었는지 확인하세요.")
+        raise ValueError(f"데이터 타입 변환 실패: {e}")
+
+    # [추가] 빈 데이터 체크
+    if data.empty:
+        # [수정] 빈 데이터일 경우 예외 발생
+        print("[오류] 전처리 결과 데이터가 비어있습니다 (0행 또는 0열).")
+        raise ValueError("전처리 후 데이터가 비어 있습니다. 인덱스 매칭이나 NaN 제거 과정을 확인하세요.")
+    
+    # 병합된 데이터에서 다시 샘플 수 계산
+    # (pd.concat 이후 컬럼 수가 변하지는 않지만 안전하게 확인)
+    n_a = a.shape[1]
+    n_b = b.shape[1]
+    
+    # 그룹 정보 생성 (Group A, Group B)
+    groups = ["GroupA"] * n_a + ["GroupB"] * n_b
+    
+    print(f"1. 데이터 R로 변환 중... (Features: {data.shape[0]}, Samples: {data.shape[1]})")
+
+    # Design Matrix 생성
+    group_factor = base.factor(StrVector(groups))
+    globalenv['group_factor'] = group_factor
+    
+    design = r['model.matrix'](r('~ 0 + group_factor'))
+    globalenv['design'] = design
+    r('colnames(design) <- levels(group_factor)')
+    design = globalenv['design']
+    
+    # 데이터를 R 환경에 등록 ('r_data')
+    with localconverter(rpy2.robjects.default_converter + pandas2ri.converter + numpy2ri.converter):
+        r_data = pandas2ri.py2rpy(data)
+        globalenv['r_data'] = r_data
+
+    print("2. Linear Model 적합 (lmFit)...")
+    # [수정] 명시적으로 as.matrix() 호출하여 R 데이터 프레임을 행렬로 변환
+    r('r_data <- as.matrix(r_data)')
+    
+    # [수정] 데이터 모드를 강제로 numeric으로 설정
+    # "Error in getEAWP(object) : Data object doesn't contain numeric expression values" 오류 해결
+    r('storage.mode(r_data) <- "numeric"')
+    
+    r('fit <- limma::lmFit(r_data, design)')
+    
+    # [수정] Contrast: GroupA - GroupB
+    print("3. 대비(Contrast) 행렬 생성 및 적용 (GroupA - GroupB)...")
+    contrast_str = "GroupA-GroupB"
+    r(f'contrast.matrix <- limma::makeContrasts(contrasts="{contrast_str}", levels=design)')
+    r('fit2 <- limma::contrasts.fit(fit, contrast.matrix)')
+        
+    print("4. Empirical Bayes 보정 (eBayes)...")
+    r('fit2 <- limma::eBayes(fit2)')
+    
+    print("5. 결과 추출 (topTable)...")
+    # [수정] sort.by="none" 추가: 입력 순서 유지
+    r('results <- limma::topTable(fit2, adjust.method="BH", sort.by="none", number=Inf)')
+    
+    results = globalenv['results']
+    
+    # R DataFrame -> Pandas DataFrame 변환
+    with localconverter(rpy2.robjects.default_converter + pandas2ri.converter):
+        pd_results = rpy2.robjects.conversion.rpy2py(results)
+    
+    # 결과 매핑
+    statistic = pd_results['t'].values
+    pvalue = pd_results['P.Value'].values
+    
+    # nan_policy='omit'을 썼다면 인덱스가 달라질 수 있으므로, 결과 DataFrame의 인덱스를 확인하는 것이 좋음
+    # 여기서는 값만 반환하지만, 실제 사용 시엔 pd_results 자체를 활용하는 것이 좋음
+    
+    return TtestResult(statistic=statistic, pvalue=pvalue)
+
+
 def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
     #logger.info(_color)
     #print(_color)
@@ -65,13 +231,18 @@ def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
     group_exp = _df[_df['group_name'] == group_names[0]][_region_ids]
     group_veh = _df[_df['group_name'] == group_names[1]][_region_ids]
     pvalues = None
+    #v = random.random()
+    #group_exp.to_csv(f'group_exp{v}.csv')
+    #group_veh.to_csv(f'group_veh{v}.csv')
+
     #print(group_exp)
     #print(group_veh)
+    logger.info(f"{p_or_t}")
     if p_or_t == 'permutation-test':
         if test_mode:
             pvalues = [random.random() for i in range(len(_region_ids))]
         else:
-            logger.info("@@@@@@@@@@ "+p_or_t)
+            
             res = stats.permutation_test((group_exp, group_veh), mystatistic, n_resamples= 500,random_state = None)
             pvalues = res.pvalue
       
@@ -79,9 +250,13 @@ def _stat_test(_df_agg, _color, p_or_t, test_mode = False):
         if test_mode:
             pvalues = [random.random() for i in range(len(_region_ids))]
         else:
-            logger.info("@@@@@@@@@@ "+p_or_t)
-
             t_stat, pvalues = stats.ttest_ind(group_exp, group_veh)
+    elif p_or_t == 'moderated-t-test':
+        if test_mode:
+            pvalues = [random.random() for i in range(len(_region_ids))]
+        else:
+
+            t_stat, pvalues = run_limma_via_rpy2(group_exp.T, group_veh.T)
       
 
     pvalues = [1 if np.isnan(x) else x for x in pvalues]
@@ -245,14 +420,16 @@ def cal_fdr(cfos,_df_pvalue,  _alpha = 0.05, result_filename='output/pvalue_perm
     
     return final_df
 
-def cal_fold(cfos, df_mean_cor_sag, g1_name, g2_name, result_filename="output/fold.csv"):
+def cal_fold(cfos,log_2 , df_mean_cor_sag, g1_name, g2_name, result_filename="output/fold.csv"):
     
     if not os.path.exists(result_filename):
         logger.info(f"cal fold : {g1_name}/{g2_name}")
         _df_list = []
         _df_columns = []
         color_list = sorted(list(set(df_mean_cor_sag['color'])))            
-
+        logger.info(f"sample_id : {df_mean_cor_sag['sample_id'].values}")
+        logger.info(f"signal : {color_list}")
+        #logger.info(f"len : {len(df_mean_cor_sag.columns)}")
         #color_list = cfos._get_columns_color(df_mean_cor_sag, cfos.color_list_full)
         
         for _color in color_list:#cfos.color_list_full:
@@ -278,13 +455,20 @@ def cal_fold(cfos, df_mean_cor_sag, g1_name, g2_name, result_filename="output/fo
                     if _row[1] == 0:
                         _row_new['fold'] = 0
                     else:
-                        _row_new['fold'] = _row[0] / _row[1]
+                        if log_2:
+                            _row_new['fold'] = _row[0] - _row[1]
+                        else:
+                            _row_new['fold'] = _row[0] / _row[1]
                 else:
                     if _row[1] == 0:
                         _row_new['fold'] = 0
                     else:
-                        _row_new['fold'] = _row[0] / _row[1]
+                        if log_2:
+                            _row_new['fold'] = _row[0] - _row[1]
+                        else:
+                            _row_new['fold'] = _row[0] / _row[1]
                 _row_list.append(_row_new)
+
             _df_fold_temp = pd.DataFrame(_row_list)
             _df_fold_temp['Region ID'] = _df_fold_temp['Region ID'].astype(str)
             #print(_df_fold_temp)

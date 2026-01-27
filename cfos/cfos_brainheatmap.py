@@ -112,9 +112,9 @@ def _get_dict_of_fold_change_values(df_fold, ptest,  _column, pvalue_th = 0.05, 
 
         _value = _row[_column]
         if abs(_value) != np.inf:
-            if _value> fold_up:
+            if _value > fold_up:
                 data_dict['up'][_column][str(region_id)] = _value
-            elif _value < fold_down and _value > 0:
+            elif _value <= fold_down:
                 data_dict['down'][_column][str(region_id)] = _value
     return data_dict
     #print('not_found_region_id',len(not_found_region_id))
@@ -336,53 +336,122 @@ def full_extent(ax, pad=0.0):
     return bbox.expanded(1.0 + pad, 1.0 + pad)
 import seaborn as sns
 
-def _draw_heatmap_for_all_signals(filename_sig_regions,_df_merged, color_name_list_full,group1_name, group2_name, stat_name, fold_up, fold_down):
+def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merged, 
+                                  color_name_list_full,group1_name, group2_name, stat_name, min_v, max_v):
 
     def _draw_heatmap_temp(_ax, heatmap_data, color, min_val, max_val):
 
         cbar_ticks = [min_val, max_val]
         sns.heatmap(heatmap_data, ax=_ax, annot=False, fmt='.1f',# [핵심] 최대값을 색상 범위 끝으로 설정
-                        vmax=max_val, vmin=min_val,linewidths=0,    # [핵심] 격자 선의 두께 (보통 0.5 ~ 1 정도가 적당)
-                        #linecolor='gray',
+                        vmax=max_val, vmin=min_val, linewidths=0,    # [핵심] 격자 선의 두께 (보통 0.5 ~ 1 정도가 적당)
+                        xticklabels = "auto",
                         cbar_kws={
                             'ticks': cbar_ticks,  # 눈금 위치 지정
                             'format': '%.2f',
-                        }, cmap=color, xticklabels=100)
+                            'pad': 0.1
+                        }, 
+                        cmap=color
+                        )
         for side in ['top', 'bottom', 'left', 'right']:
             _ax.spines[side].set_visible(True)   # 테두리가 보이게 설정
             _ax.spines[side].set_linewidth(1)    # 테두리 두께 (2로 설정하면 진하게 보임)
             _ax.spines[side].set_color('gray')  # 테두리 색상
+        
+
+        # 4. 범위를 지정하고 라벨 설정하기
+        # 예: (시작 인덱스, 끝 인덱스, "표시할 이름")
+        ranges = [
+            (0, 122, "Front, Motor, \nSoma, Visc, Gust"),
+            (124, 253, "Aud, Vis, \nCing, lim"),
+            (254, 279, "Orbital"),
+            (280, 298, "Insular"),
+            (299, 380, "Retroplenial, \nTemporal, Rhinal"),
+            (381, 455, "olfactory"),
+            (456, 594, "Hippocampal \nformation"),
+            (595, 642, "Amygdala, \nPallidal"),
+            (643, 716, "Thalamus"),
+            (717, 807, "Hypothalamus"),
+            (808, 884, "Midbrain"),
+            (885, 936, "Pons"),
+            (937, 1015, "Medulla"),
+        ]
+        #_ax.axvspan(124, 253, color='gray', alpha=0.2, label='Group C')
+        # 라벨이 찍릴 위치(ticks)와 이름(labels)을 저장할 리스트
+        xticks_positions = []
+        xticklabels_names = []
+
+        for _index, (start, end, label) in enumerate(ranges):
+            # 범위의 '중심' 위치 계산
+            center = int((start + end) / 2 ) 
+            xticks_positions.append(center)
+            xticklabels_names.append(label)
+            #if _index % 2 == 1:
+            #    _ax.axvspan(start, end, color='gray', alpha=0.05)
+            # (선택사항) 구분선 그리기: 범위의 끝지점에 선을 그어 구역을 나눔
+            #f end < 1000:
+            #    plt.axvline(x=end, color='white', linestyle='--', linewidth=1)
+        #xticks_positions.append(1000)
+        #xticklabels_names.append('label')
+        # 5. x축 틱과 라벨 적용
+        print(heatmap_data.columns)
+        print(len(xticks_positions),xticks_positions)
+        _ax.set_xticks(xticks_positions)
+        _ax.set_xticklabels(xticklabels_names, rotation=45, fontsize=10)
+        
 
         # 3. Y축 방향(가로줄) 경계선 직접 그리기
         # 데이터의 행 개수(rows)와 열 개수(cols)를 구합니다.
         rows, cols = heatmap_data.shape
 
+        print('rows,cols',rows,cols)
+        _ax.hlines(y=range(1, rows), xmin=0, xmax=ranges[-1][1], colors='red', linewidths=0.5)
 
-        _ax.hlines(y=range(1, rows), xmin=0, xmax=cols, colors='gray', linewidths=0.5)
+
         cbar = _ax.collections[0].colorbar
         cbar.ax.tick_params(labelsize=10)  # 폰트 크기 (원하는 크기로 숫자를 변경하세요)
-        cbar.set_label(f'Fold change:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=6)
+        if log2_transform:
+            cbar.set_label(f'Log2 FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
+        else:
+            cbar.set_label(f'FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
+
         cbar.ax.tick_params(size=0)
-        _ax.tick_params(axis='y', labelrotation=0)
-        _ax.set_yticklabels(axes[0].get_yticklabels(), rotation=0, va='center')
+        #_ax.tick_params(axis='y', labelrotation=0)
+        #_ax.set_yticklabels(axes[0].get_yticklabels(), rotation=0, va='center')
+
+        _ax.tick_params(axis='y', labelleft=True, labelright=True, labelrotation=0)
+
+        # 만약 va='center' (수직 정렬) 등 tick_params에 없는 설정을 꼭 해야 한다면,
+        # set_yticklabels 대신 객체를 직접 꺼내서 수정해야 합니다.
+        for label in _ax.get_yticklabels():
+            label.set_verticalalignment('center')
+
     #plt.figure(figsize=(15, 3))  # 그래프 크기 조절
-    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, int(len(color_name_list_full))))
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(15, int(len(color_name_list_full)*1)))
     #plt.yticks(rotation=90) # Y축 글자 수평 정렬
     heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
-    heatmap_data[heatmap_data < fold_up] = 0
-    _draw_heatmap_temp(axes[0], heatmap_data.T, 'Greens', fold_up, heatmap_data.max().max())
+    #heatmap_data[heatmap_data == -np.inf] = np.nan
+    #min_value = heatmap_data.min().min()
+    #heatmap_data[heatmap_data < fold_up] = 0
+    #_draw_heatmap_temp(axes, heatmap_data.T, 'RdBu_r', 0.0, heatmap_data.max().max())
+    heatmap_data = heatmap_data.T
+    #print(heatmap_data)
+    #print(heatmap_data.index)
+    #print(heatmap_data.columns)
 
-    heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
-    heatmap_data[heatmap_data > fold_down] = 0
-    _draw_heatmap_temp(axes[1], heatmap_data.T, 'Reds', 0.0, fold_down)
+    #heatmap_data.set_index('TG number', inplace=True)
+
+    _draw_heatmap_temp(axes, heatmap_data, 'RdBu',min_v,max_v)
+    #heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
+    #heatmap_data[heatmap_data > fold_down] = 0
+    #_draw_heatmap_temp(axes[1], heatmap_data.T, 'Reds', 0.0, fold_down)
 
     fig.suptitle(f'{stat_name}', fontsize=10)
-    plt.xlabel('TG Number')  # X축 이름
+    plt.xlabel('')  # X축 이름
     #plt.ylabel('Signals')  # Y축 이름
     
     plt.tight_layout(rect=[0, 0, 1, 1])
     #plt.show()
-    fig.savefig(filename_sig_regions, dpi=600, bbox_inches='tight', pad_inches=1)
+    plt.savefig(filename_sig_regions, dpi=600, bbox_inches='tight', pad_inches=0)
 
 def _gen_brain_heatmap(output_dir,params, ptest, color_code,
                        color_2_dict_up,color_2_dict_down, gen_individual_image = False):
@@ -400,7 +469,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
         return
     fig = plt.figure(figsize=(25*(params.num_of_imgs_in_brain_heatmap/20), 10))
     #fig, axs = plt.subplots(2,7, figsize=(30, 10))
-    fig.suptitle(f'{color_code}  {params.group1_name} / {params.group2_name}', fontsize=20)
+    fig.suptitle(f'{color_code} \n {params.stat_test_name()}', fontsize=10)
     spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap + 1, nrows=8, 
                              width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.15], 
                              height_ratios = [1,1,1,0.2,1,1,1,0.2], 
@@ -452,7 +521,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
 
         _max = np.max(list(data_dict.values()))
         _min = np.min(list(data_dict.values()))
-        print("max/min",_max, _min)
+        #print("max/min",_max, _min)
         maxmin_dict[_ii] = str(_max)+"/"+str(_min)
         
         # AP Frontal 12000
@@ -507,7 +576,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
                     # Alternatively,
                     os.makedirs(f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}', exist_ok=True)
                     # extent = ax.get_tightbbox(fig.canvas.renderer).transformed(fig.dpi_scale_trans.inverted())
-                    ind_file = f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.tiff'
+                    ind_file = f'{output_dir}/{cfos_util.sanitize_folder_name(color_code)}/heatmap_{color.replace("_r","")}_{cut}_{str(distance)}_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}.tiff'
                     fig.savefig(ind_file, bbox_inches=extent,dpi=600, pad_inches=1)
                     tiff_files.append(ind_file)
 
@@ -526,7 +595,10 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
                 )   
                 for t in cbar.ax.get_yticklabels():
                     t.set_fontsize(5)
-                cbar.set_label(f'Fold \u0394\n({params.group1_name} / {params.group2_name})', fontsize=5)
+                if params.log_2_transform:
+                    cbar.set_label(f'Log2 Fold \u0394\n({params.group1_name} / {params.group2_name})', fontsize=5)
+                else:
+                    cbar.set_label(f'Fold  \u0394\n({params.group1_name} / {params.group2_name})', fontsize=5)
             ax_row_index += 1
        
                     # Read the first TIFF file
@@ -566,7 +638,8 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
 
     logger.info(f"not_visualized_region:{not_visualized_regions}")
 
-    _filename = f'{output_dir}/one_heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}_{params.stat_test_name()}.png'
+    #_filename = f'{output_dir}/heatmap_{params.heatpmap_vis_name()}_{cfos_util.sanitize_folder_name(color_code)}.png'
+    _filename = f'{output_dir}/heatmap_{cfos_util.sanitize_folder_name(color_code)}.png'
     fig.savefig(_filename, dpi=600, bbox_inches='tight', pad_inches=1)
     logger.info(f'brain heatmap saved into : {_filename}')
 

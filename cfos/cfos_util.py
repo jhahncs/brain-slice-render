@@ -64,7 +64,7 @@ def sanitize_folder_name(folder_name):
 
 
 class Cfos_params():
-    def __init__(self, request = None):
+    def __init__(self,  request = None):
         if request == None:
             return 
         
@@ -80,7 +80,6 @@ class Cfos_params():
         self.color = request.form.get('color')
         self.dataname = request.form.get('dataname')
         
-        
         self.dist_label = 'false' if 'distanceLabel' not in request.form else str(request.form.get('distanceLabel')).lower()
         self.num_of_imgs_in_brain_heatmap = 10 if 'numOfSlices' not in request.form else int(request.form.get('numOfSlices'))
         
@@ -89,10 +88,27 @@ class Cfos_params():
         items = [f"{key}: {value}" for key, value in vars(self).items()]
         return "{" + ", ".join(items) + "}"
     
+    def get_csv_cols(self):
+        return ['folder_name','group1_name','group2_name','pairwiseCompareMethod','multipleCompareCorrectionMethod','fdr_alpha','pvalue_th','fold_up','fold_down']
+    def get_csv_row(self):
+        return [self.group1_name,self.group2_name,self.pairwiseCompareMethod,self.multipleCompareCorrectionMethod,self.fdr_alpha,self.pvalue_th,self.fold_up,self.fold_down]
+    def get_dict(self, _id ):
+        return {'folder_name':_id,
+                'group1_name':self.group1_name,
+                'group2_name':self.group2_name,
+                'pairwiseCompareMethod':self.pairwiseCompareMethod,
+                'multipleCompareCorrectionMethod':self.multipleCompareCorrectionMethod,
+                'fdr_alpha':self.fdr_alpha,
+                'pvalue_th':self.pvalue_th,
+                'fold_up':self.fold_up,
+                'fold_down':self.fold_down}
+
     def stat_test_name(self):
-        return f'{self.group1_name}_{self.group2_name}_{self.pairwiseCompareMethod}_{self.multipleCompareCorrectionMethod}_a{str(self.fdr_alpha)}_p{str(self.pvalue_th)}_u{str(self.fold_up)}_d{str(self.fold_down)}'
+        return f'{self.group1_name} VS {self.group2_name} {self.pairwiseCompareMethod}/{self.multipleCompareCorrectionMethod}\nFDR_alpha:{str(self.fdr_alpha)} p-value:{str(self.pvalue_th)}'
+    
     def heatpmap_vis_name(self):
         return f'{self.dist_label}_{self.num_of_imgs_in_brain_heatmap}'
+    
     def stat_desc(self):
         r = ''
         r += f'Pairwise comparison: {self.pairwiseCompareMethod}'
@@ -111,8 +127,10 @@ class Cfos():
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.prefix_to_remove_column = ['%E ','N=','Mean ','Mean_','SEM_','Unnamed',"average","VEH ","EXP","mean","Sem","sem","%error",'Analyses']
+        self.exp_params_filename = output_dir+"/exp_params.csv"
 
         self.cor_and_sag_sep_mode = False
+        #self.cor_vs_sag_analysis = True
         self.df_dict = {}
         
         if not load_from_files :
@@ -208,6 +226,22 @@ class Cfos():
         logger.info(f"group names:{self.group_names}")
         logger.info("cfos init done")
         #df_exp.head()
+
+        
+    def add_exp_param(self, param):
+        line_count = 0
+        if os.path.exists(self.exp_params_filename):
+            with open(self.exp_params_filename, 'r', encoding='utf-8') as f:
+                line_count = sum(1 for line in f)
+        folder_name = line_count+1
+        _row = [param.get_dict(folder_name)]
+
+        
+
+        _exp_params_df = pd.DataFrame(_row)
+        _exp_params_df.columns = param.get_csv_cols()
+        _exp_params_df.to_csv(self.exp_params_filename, mode='a', header=not os.path.exists(self.exp_params_filename), index=False, encoding='utf-8-sig')
+        return folder_name
     def validation_report(self):
         response = {}
         if len(self.not_matched_tg_numbers) > 0:
@@ -280,7 +314,8 @@ class Cfos():
             row["TG Number"] = self.region_id_2_tg_id[r_id]
             rows.append(row)
         return pd.DataFrame(rows)
-    def build_group1_and_group2(self, df_group1_name, df_group2_name, load_from_files = False):
+    def build_group1_and_group2(self, df_group1_name, df_group2_name, 
+                                log_2 = True, delete_rows_with_zeros = False, load_from_files = False):
         df_group1 = self.df_dict[df_group1_name].copy()
 
         df_group1 = df_group1[~df_group1['TG number'].astype(int).between(1016, 1328)]
@@ -305,13 +340,15 @@ class Cfos():
 
             region_ids_with_zero = self._get_metadata(self.df_by_two_group_and_region, df_group1_name, df_group2_name)
             self.region_ids_to_dataframe(region_ids_with_zero).to_csv(filename_df_regions_zero, index=None)
-            logger.info(f'region_ids_with_zero : {region_ids_with_zero}')
+            logger.info(f'region_ids_with_zero : {len(region_ids_with_zero)} {region_ids_with_zero[:5]}')
 
             df_total = pd.concat([df_group1.drop(['TG number','Region ID','Region name'] ,axis=1).reset_index(drop=True),df_group2.drop(['TG number','Region name'] ,axis=1).reset_index(drop=True)], axis=1)
             #df_total.set_index('TG number', inplace=True)
             df_total.set_index('Region ID', inplace=True)
-            if len(region_ids_with_zero) > 0:
+            if delete_rows_with_zeros and len(region_ids_with_zero) > 0:
                 df_total = df_total.drop(region_ids_with_zero)
+
+
             df_total = df_total.T
             df_total['sample_id'] = [a.split('_')[0] for a in df_total.index]
             subject_id_group1 = self._get_sample_ids(df_group1_name)
@@ -340,9 +377,12 @@ class Cfos():
 
         self.df_by_two_group_and_color = pd.read_csv(filename_df_raw)
         logger.info(f'two group by color data loaded from : {filename_df_raw}')
+
         self.df_by_two_group_and_color.set_index('Unnamed: 0',inplace=True)
-
-
+        if log_2:
+            numeric_cols = self.df_by_two_group_and_color.select_dtypes(include='number').columns
+            self.df_by_two_group_and_color[numeric_cols] = np.log2(self.df_by_two_group_and_color[numeric_cols] + 1)
+            #self.df_by_two_group_and_color[numeric_cols][self.df_by_two_group_and_color[numeric_cols] == -np.inf] = 0
 
     def _int_2_str(self, _df):
         if 'Region ID' in _df.columns:
@@ -505,11 +545,11 @@ class Cfos():
         #self.df_dict[_name].to_csv(filename_df_temp, index=None)
         return _df
     def _agg_cor_sag(self, _df):
-        self.cor_and_sag_sep_mode = True
-        for _c in _df.columns[3:]:
-            if _c.startswith("AVG "):
-                self.cor_and_sag_sep_mode = False
-                break
+        #self.cor_and_sag_sep_mode = True
+        #for _c in _df.columns[3:]:
+        #    if _c.startswith("AVG "):
+        #        self.cor_and_sag_sep_mode = False
+        #        break
         
 
 
@@ -527,6 +567,8 @@ class Cfos():
             cols_avg = []
             new_data = {}  # or a list of DataFrames
             # 반복문을 통해 각 수준별로 평균 열을 생성하고, 삭제할 열 이름 수집
+
+
             for s in sample_ids:
                 for level in cfos_levels:
                     cor_col = f'{s}_cor_{level}'
