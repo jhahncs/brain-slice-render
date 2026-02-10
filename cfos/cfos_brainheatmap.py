@@ -337,8 +337,12 @@ def full_extent(ax, pad=0.0):
 import seaborn as sns
 
 def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merged, 
-                                  color_name_list_full,group1_name, group2_name, stat_name, min_v, max_v):
-
+                                  color_name_list_full,
+                                  group1_name, group1_hemisphere, group2_name,  group2_hemisphere, 
+                                  stat_name, min_v, max_v):
+    #print('CFOShigh' in  color_name_list_full)
+    if 'CFOShigh' in  color_name_list_full and len(color_name_list_full) == 3:
+        color_name_list_full = ['CFOShigh','CFOSmed','CFOSlow']
     def _draw_heatmap_temp(_ax, heatmap_data, color, min_val, max_val):
 
         cbar_ticks = [min_val, max_val]
@@ -355,7 +359,7 @@ def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merge
         for side in ['top', 'bottom', 'left', 'right']:
             _ax.spines[side].set_visible(True)   # 테두리가 보이게 설정
             _ax.spines[side].set_linewidth(1)    # 테두리 두께 (2로 설정하면 진하게 보임)
-            _ax.spines[side].set_color('gray')  # 테두리 색상
+            _ax.spines[side].set_color('black')  # 테두리 색상
         
 
         # 4. 범위를 지정하고 라벨 설정하기
@@ -385,16 +389,19 @@ def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merge
             center = int((start + end) / 2 ) 
             xticks_positions.append(center)
             xticklabels_names.append(label)
-            #if _index % 2 == 1:
-            #    _ax.axvspan(start, end, color='gray', alpha=0.05)
+            if _index % 2 == 1:
+                
+                _ax.axvline(x=start, color='black', linestyle='--', linewidth=1)
+                #_ax.axvspan(start, end, color='gray', alpha=0.05)
+                _ax.axvline(x=end, color='black', linestyle='--', linewidth=1)
             # (선택사항) 구분선 그리기: 범위의 끝지점에 선을 그어 구역을 나눔
             #f end < 1000:
             #    plt.axvline(x=end, color='white', linestyle='--', linewidth=1)
         #xticks_positions.append(1000)
         #xticklabels_names.append('label')
         # 5. x축 틱과 라벨 적용
-        print(heatmap_data.columns)
-        print(len(xticks_positions),xticks_positions)
+        #print(heatmap_data.columns)
+        #print(len(xticks_positions),xticks_positions)
         _ax.set_xticks(xticks_positions)
         _ax.set_xticklabels(xticklabels_names, rotation=45, fontsize=10)
         
@@ -403,16 +410,22 @@ def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merge
         # 데이터의 행 개수(rows)와 열 개수(cols)를 구합니다.
         rows, cols = heatmap_data.shape
 
-        print('rows,cols',rows,cols)
-        _ax.hlines(y=range(1, rows), xmin=0, xmax=ranges[-1][1], colors='red', linewidths=0.5)
+        #print('rows,cols',rows,cols)
+        _ax.hlines(y=range(1, rows), xmin=0, xmax=ranges[-1][1], colors='black', linewidths=0.3)
 
 
         cbar = _ax.collections[0].colorbar
         cbar.ax.tick_params(labelsize=10)  # 폰트 크기 (원하는 크기로 숫자를 변경하세요)
         if log2_transform:
-            cbar.set_label(f'Log2 FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
+            if group1_name.endswith('male'):
+                cbar.set_label(f'Log2 FC:\n{group1_name.split("_")[-2]} / {group2_name.split("_")[-2]}' , size=8)
+            else:
+                cbar.set_label(f'Log2 FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
         else:
-            cbar.set_label(f'FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
+            if group1_name.endswith('male'):
+                cbar.set_label(f'FC:\n{group1_name.split("_")[-2]} / {group2_name.split("_")[-2]}' , size=8)
+            else:
+                cbar.set_label(f'FC:\n{group1_name.split("_")[-1]} / {group2_name.split("_")[-1]}' , size=8)
 
         cbar.ax.tick_params(size=0)
         #_ax.tick_params(axis='y', labelrotation=0)
@@ -428,7 +441,7 @@ def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merge
     #plt.figure(figsize=(15, 3))  # 그래프 크기 조절
     fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(15, int(len(color_name_list_full)*1)))
     #plt.yticks(rotation=90) # Y축 글자 수평 정렬
-    heatmap_data = _df_merged.set_index('TG number')[sorted(color_name_list_full)].copy()
+    heatmap_data = _df_merged.set_index('TG number')[color_name_list_full].copy()
     #heatmap_data[heatmap_data == -np.inf] = np.nan
     #min_value = heatmap_data.min().min()
     #heatmap_data[heatmap_data < fold_up] = 0
@@ -452,9 +465,10 @@ def _draw_heatmap_for_all_signals(log2_transform, filename_sig_regions,_df_merge
     plt.tight_layout(rect=[0, 0, 1, 1])
     #plt.show()
     plt.savefig(filename_sig_regions, dpi=600, bbox_inches='tight', pad_inches=0)
+    plt.savefig(filename_sig_regions.replace('.png','.pdf'), dpi=600, bbox_inches='tight', pad_inches=0)
 
 def _gen_brain_heatmap(output_dir,params, ptest, color_code,
-                       color_2_dict_up,color_2_dict_down, gen_individual_image = False):
+                       color_2_dict_up,color_2_dict_down, stat_name,gen_individual_image = False):
     
     
     
@@ -469,7 +483,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
         return
     fig = plt.figure(figsize=(25*(params.num_of_imgs_in_brain_heatmap/20), 10))
     #fig, axs = plt.subplots(2,7, figsize=(30, 10))
-    fig.suptitle(f'{color_code} \n {params.stat_test_name()}', fontsize=10)
+    fig.suptitle(f'{color_code} \n {stat_name}', fontsize=10)
     spec = gridspec.GridSpec(ncols=params.num_of_imgs_in_brain_heatmap + 1, nrows=8, 
                              width_ratios=[1]*params.num_of_imgs_in_brain_heatmap + [0.15], 
                              height_ratios = [1,1,1,0.2,1,1,1,0.2], 
@@ -648,7 +662,7 @@ def _gen_brain_heatmap(output_dir,params, ptest, color_code,
     #return plt
 
 def gen_brain_heatmap(_cfos,output_dir, stat_test_result, color_list, 
-                      color_2_dict_up,color_2_dict_down, params, single_core_mode = False):       
+                      color_2_dict_up,color_2_dict_down, params, _stat_name, single_core_mode = False):       
     
     global cfos
     cfos = _cfos
@@ -659,6 +673,7 @@ def gen_brain_heatmap(_cfos,output_dir, stat_test_result, color_list,
     color_2_dict_up_list= []
     color_2_dict_down_list= []
     color_code_list = []
+    _stat_name_list = []
     for color_code in color_list:
         output_dir_list.append(output_dir)
         parama_list.append(params)
@@ -666,10 +681,11 @@ def gen_brain_heatmap(_cfos,output_dir, stat_test_result, color_list,
         ptest_list.append(stat_test_result)
         color_2_dict_up_list.append(color_2_dict_up)
         color_2_dict_down_list.append(color_2_dict_down)
+        _stat_name_list.append(_stat_name)
         if single_core_mode:
-            _gen_brain_heatmap(output_dir,params,stat_test_result,color_code, color_2_dict_up,color_2_dict_down )
+            _gen_brain_heatmap(output_dir,params,stat_test_result,color_code, color_2_dict_up,color_2_dict_down,_stat_name_list )
 
     if not single_core_mode:
         print(f'the number of jobs:{len(color_code_list)}')
         with multiprocessing.Pool() as pool: # Use a pool of 4 processes
-            pool.starmap(_gen_brain_heatmap, zip(output_dir_list,parama_list,ptest_list, color_code_list, color_2_dict_up_list,color_2_dict_down_list))
+            pool.starmap(_gen_brain_heatmap, zip(output_dir_list,parama_list,ptest_list, color_code_list, color_2_dict_up_list,color_2_dict_down_list,_stat_name_list))

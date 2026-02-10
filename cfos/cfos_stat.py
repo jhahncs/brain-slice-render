@@ -431,12 +431,16 @@ def cal_fold(cfos,log_2 , df_mean_cor_sag, g1_name, g2_name, result_filename="ou
         logger.info(f"signal : {color_list}")
         #logger.info(f"len : {len(df_mean_cor_sag.columns)}")
         #color_list = cfos._get_columns_color(df_mean_cor_sag, cfos.color_list_full)
-        
+        g1_sample_ids = None
+        g2_sample_ids = None
         for _color in color_list:#cfos.color_list_full:
             #for _cut_method in ['cor','sag']:
-
-            _df_total_g1 = df_mean_cor_sag.query(f'color=="{_color}" and group_name == "{g1_name}" ').drop(['group_name','color','sample_id'],axis=1).copy()
-            _df_total_g2 = df_mean_cor_sag.query(f'color=="{_color}" and group_name == "{g2_name}" ').drop(['group_name','color','sample_id'],axis=1).copy()
+            _df_total_g1 = df_mean_cor_sag.query(f'color=="{_color}" and group_name == "{g1_name}" ')
+            g1_sample_ids = _df_total_g1['sample_id'].values
+            _df_total_g2 = df_mean_cor_sag.query(f'color=="{_color}" and group_name == "{g2_name}" ')
+            g2_sample_ids = _df_total_g2['sample_id'].values
+            _df_total_g1 = _df_total_g1.drop(['group_name','color','sample_id'],axis=1).copy()
+            _df_total_g2 = _df_total_g2.drop(['group_name','color','sample_id'],axis=1).copy()
                 
             #_df_fold_temp = _df_total_exp.mean(axis=0) / _df_total_veh.mean(axis=0)
             _df_total_exp_veh = pd.concat([_df_total_g1.mean(axis=0), _df_total_g2.mean(axis=0)], axis=1)
@@ -499,4 +503,4 @@ def cal_fold(cfos,log_2 , df_mean_cor_sag, g1_name, g2_name, result_filename="ou
     _df_fold['TG number'] = _df_fold['TG number'].astype(str)
     _df_fold['Region ID'] = _df_fold['Region ID'].astype(str)
     _df_fold.set_index("Region ID", inplace=True)
-    return  _df_fold
+    return  _df_fold, g1_sample_ids, g2_sample_ids

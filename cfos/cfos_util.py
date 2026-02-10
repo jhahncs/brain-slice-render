@@ -70,6 +70,8 @@ class Cfos_params():
         
         self.group1_name = request.form.get('group1_name')
         self.group2_name = request.form.get('group2_name')
+        self.group1_hemisphere = request.form.get('group1_hemisphere')
+        self.group2_hemisphere = request.form.get('group2_hemisphere')
         self.pairwiseCompareMethod = request.form.get('pairwiseCompareMethod')
         self.multipleCompareCorrectionMethod = request.form.get('multipleCompareCorrectionMethod')
         self.fdr_alpha = request.form.get('fdr_alpha')
@@ -103,9 +105,21 @@ class Cfos_params():
                 'fold_up':self.fold_up,
                 'fold_down':self.fold_down}
 
-    def stat_test_name(self):
-        return f'{self.group1_name} VS {self.group2_name} {self.pairwiseCompareMethod}/{self.multipleCompareCorrectionMethod}\nFDR_alpha:{str(self.fdr_alpha)} p-value:{str(self.pvalue_th)}'
-    
+    def stat_test_name(self,g1_sample_ids = None, g2_sample_ids= None, fdr = False):
+
+        _s = None
+        if self.group1_hemisphere is not None:
+            _s = f'{self.group1_name}({self.group1_hemisphere}) VS {self.group2_name}({self.group2_hemisphere})'
+        else:
+            _s = f'{self.group1_name} VS {self.group2_name}'
+
+        if g1_sample_ids is not None:
+            _s = _s+"\n"+f'{",".join(g1_sample_ids)}'+ " VS " + f'{",".join(g2_sample_ids)}'
+
+        if fdr:
+            _s = _s+"\n"+f'{self.pairwiseCompareMethod}/{self.multipleCompareCorrectionMethod} FDR_alpha:{str(self.fdr_alpha)} p-value:{str(self.pvalue_th)}'
+
+        return _s
     def heatpmap_vis_name(self):
         return f'{self.dist_label}_{self.num_of_imgs_in_brain_heatmap}'
     
@@ -122,15 +136,15 @@ class Cfos_params():
         return r
 
 class Cfos():
-    def __init__(self, filename, output_dir='output', load_from_files = False):
+    def __init__(self, filename, output_dir='output', cor_vs_sag_analysis = False, load_from_files = False):
         logger.info("cfos init begin")
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.prefix_to_remove_column = ['%E ','N=','Mean ','Mean_','SEM_','Unnamed',"average","VEH ","EXP","mean","Sem","sem","%error",'Analyses']
         self.exp_params_filename = output_dir+"/exp_params.csv"
 
-        self.cor_and_sag_sep_mode = False
-        #self.cor_vs_sag_analysis = True
+        #self.cor_and_sag_sep_mode = False
+        self.cor_vs_sag_analysis = cor_vs_sag_analysis
         self.df_dict = {}
         
         if not load_from_files :
@@ -220,6 +234,24 @@ class Cfos():
             logger.info(f"{_name}: {len(self.df_dict[_name].columns)} columns")
             logger.info(list(self.df_dict[_name].columns[:5]))
 
+        '''
+        male_samples = ['A0244','1049','0644','B0600','A0245','A0247','0653','0656','B0530']
+        common_cols = ['TG number','Region ID','Region name']
+        
+        for _i, _name in enumerate(self.group_names):
+            self.df_dict[_name]
+            male_cols = common_cols + [col for col in self.df_dict[_name].columns if col.split("_")[0] in male_samples and col not in common_cols]
+
+            # female_df: 공통 칼럼 + (전체 칼럼 중 공통 칼럼과 male_samples를 제외한 나머지)
+            female_cols = common_cols + [col for col in self.df_dict[_name].columns if col.split("_")[0] not in male_samples and col not in common_cols]
+
+            # 3. 데이터프레임 분할 (원본 보존을 위해 copy 사용 권장)
+            male_df = self.df_dict[_name][male_cols].copy()
+            female_df = self.df_dict[_name][female_cols].copy()
+            self.df_dict[_name+"_female"] = female_df
+            self.df_dict[_name+"_male"] = male_df
+            self.df_dict.pop(_name)
+        '''
         #assert len(self.df_exp) == len(self.df_veh), 'not the same size in EXP and VEH'
 
         self.group_names = sorted(self.group_names)
@@ -314,17 +346,30 @@ class Cfos():
             row["TG Number"] = self.region_id_2_tg_id[r_id]
             rows.append(row)
         return pd.DataFrame(rows)
-    def build_group1_and_group2(self, df_group1_name, df_group2_name, 
+    def _filter_by_sub_groups(self, _df, sub_group_name):
+
+        _df = _df[~_df['TG number'].astype(int).between(1016, 1328)]
+        if sub_group_name is not None and sub_group_name.lower() in ['cor','sag']:
+            removed_cols = sorted(list(set([c for c in _df.columns if sub_group_name.lower() not in c.lower() and c.lower() not in ['tg number','region id','region name']])))
+            _df = _df.drop(removed_cols ,axis=1)
+            _df.columns = _df.columns.str.replace(f'_{sub_group_name}_', '_', case=False, regex=True)  
+
+        return _df
+
+    def build_group1_and_group2(self, df_group1_name, g1_hemisphere, df_group2_name, g2_hemisphere,
                                 log_2 = True, delete_rows_with_zeros = False, load_from_files = False):
         df_group1 = self.df_dict[df_group1_name].copy()
-
-        df_group1 = df_group1[~df_group1['TG number'].astype(int).between(1016, 1328)]
+        
+        df_group1 = self._filter_by_sub_groups(df_group1, g1_hemisphere)
+      
 
         self.color_name_list_full = self._get_color_name_list_from_df(df_group1)
         logger.info(f'color_name_list_full: {self.color_name_list_full}')
         #color_list = sorted(list(set(df_mean_cor_sag['color']))) 
         df_group2 = self.df_dict[df_group2_name].copy()
-        df_group2 = df_group2[~df_group2['TG number'].astype(int).between(1016, 1328)]
+        df_group2 = self._filter_by_sub_groups(df_group2, g2_hemisphere)
+
+
 
         filename_df_exp_veh = f'{self.output_dir}/df_{df_group1_name}_{df_group2_name}.csv'
 
@@ -556,7 +601,7 @@ class Cfos():
 
 
 
-        if self.cor_and_sag_sep_mode:    
+        if not self.cor_vs_sag_analysis:    
             # 'cor'과 'Sag'를 평균할 CFOS 수준 리스트
             cfos_levels = list(set(["_".join(col.split('_')[2:]) for col in _df.columns if len(col.split('_')) >= 2]))
             sample_ids = list(set([col.split('_')[0] for col in _df.columns if len(col.split('_')) >= 2]))
@@ -594,11 +639,12 @@ class Cfos():
             #logger.info(f"columns(remain): {','.join(_df.columns)}")
             
         else:
-            cols_to_drop = []
-            for _c in _df.columns[3:]:
-                if not _c.startswith("AVG "):
-                    cols_to_drop.append(_c)
-            _df.drop(columns=cols_to_drop, inplace=True)
+            pass
+            #cols_to_drop = []
+            #for _c in _df.columns[3:]:
+            #    if not _c.startswith("AVG "):
+            #        cols_to_drop.append(_c)
+            #_df.drop(columns=cols_to_drop, inplace=True)
 
 
         logger.info(f"columns(remain): {','.join(_df.columns)}")
